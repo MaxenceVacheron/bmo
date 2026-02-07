@@ -17,8 +17,18 @@ int main() {
     }
 
     struct fb_var_screeninfo v0, v1;
-    ioctl(f0, FBIOGET_VSCREENINFO, &v0);
-    ioctl(f1, FBIOGET_VSCREENINFO, &v1);
+    if (ioctl(f0, FBIOGET_VSCREENINFO, &v0) < 0) {
+        perror("ioctl fb0 failed");
+        return 1;
+    }
+    
+    // If ioctl on fb1 fails, we use safe defaults for the known hardware
+    if (ioctl(f1, FBIOGET_VSCREENINFO, &v1) < 0 || v1.xres == 0) {
+        fprintf(stderr, "Warning: ioctl fb1 failed or returned 0, using defaults (480x320)\n");
+        v1.xres = 480;
+        v1.yres = 320;
+        v1.bits_per_pixel = 16;
+    }
 
     printf("FB0: %dx%d, %dbpp\n", v0.xres, v0.yres, v0.bits_per_pixel);
     printf("FB1: %dx%d, %dbpp\n", v1.xres, v1.yres, v1.bits_per_pixel);
@@ -35,22 +45,22 @@ int main() {
     }
 
     while (1) {
-        // Simple 32-bit to 16-bit conversion if needed
-        if (v0.bits_per_pixel == 32 && v1.bits_per_pixel == 16) {
+        // Just direct copy if both are 16-bit or dimensions match
+        if (v0.bits_per_pixel == v1.bits_per_pixel && v0.xres == v1.xres) {
+            memcpy(m1, m0, s1 < s0 ? s1 : s0);
+        } 
+        else if (v0.bits_per_pixel == 32 && v1.bits_per_pixel == 16) {
             unsigned int *src = (unsigned int *)m0;
             unsigned short *dst = (unsigned short *)m1;
-            for (int i = 0; i < v0.xres * v0.yres; i++) {
+            for (int i = 0; i < v1.xres * v1.yres; i++) {
                 unsigned int p = src[i];
                 unsigned char r = (p >> 16) & 0xFF;
                 unsigned char g = (p >> 8) & 0xFF;
                 unsigned char b = p & 0xFF;
                 dst[i] = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
             }
-        } else {
-            memcpy(m1, m0, s1 < s0 ? s1 : s0);
         }
-        usleep(33333); // ~30 FPS
+        usleep(33000); // ~30 FPS
     }
-
     return 0;
 }
