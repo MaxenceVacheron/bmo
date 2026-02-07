@@ -118,7 +118,7 @@ def draw_face(screen):
 def draw_menu(screen):
     screen.fill(WHITE)
     pygame.draw.rect(screen, BLACK, (0, 0, WIDTH, 50))
-    title = FONT_MEDIUM.render("BMO MENU", True, WHITE)
+    title = FONT_MEDIUM.render("BMO MENU", False, WHITE)
     screen.blit(title, (WIDTH//2 - title.get_width()//2, 10))
     
     options = ["FACE", "STATS", "CLOCK", "NOTES", "HEART"]
@@ -128,7 +128,7 @@ def draw_menu(screen):
     for i, opt in enumerate(options):
         btn_rect = (40, y + i*50, 400, 40)
         pygame.draw.rect(screen, colors[i % len(colors)], btn_rect)
-        lbl = FONT_SMALL.render(opt, True, BLACK)
+        lbl = FONT_SMALL.render(opt, False, BLACK)
         screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, y + i*50 + 10))
 
 def draw_stats(screen):
@@ -137,14 +137,14 @@ def draw_stats(screen):
     ram = get_ram_usage()
     
     y = 40
-    lbl = FONT_MEDIUM.render(f"CPU: {temp:.1f}C", True, BLACK)
+    lbl = FONT_MEDIUM.render(f"CPU: {temp:.1f}C", False, BLACK)
     screen.blit(lbl, (40, y))
     pygame.draw.rect(screen, BLACK, (40, y+40, 400, 30), 2)
     w = int(396 * (temp / 85.0))
     pygame.draw.rect(screen, RED if temp > 60 else GREEN, (42, y+42, w, 26))
     
     y += 100
-    lbl = FONT_MEDIUM.render(f"RAM: {ram:.1f}%", True, BLACK)
+    lbl = FONT_MEDIUM.render(f"RAM: {ram:.1f}%", False, BLACK)
     screen.blit(lbl, (40, y))
     pygame.draw.rect(screen, BLACK, (40, y+40, 400, 30), 2)
     w = int(396 * (ram / 100.0))
@@ -154,8 +154,8 @@ def draw_clock(screen):
     screen.fill(BLUE)
     t = time.strftime("%H:%M:%S")
     d = time.strftime("%A, %b %d")
-    lbl_t = FONT_LARGE.render(t, True, WHITE)
-    lbl_d = FONT_MEDIUM.render(d, True, WHITE)
+    lbl_t = FONT_LARGE.render(t, False, WHITE)
+    lbl_d = FONT_MEDIUM.render(d, False, WHITE)
     screen.blit(lbl_t, (WIDTH//2 - lbl_t.get_width()//2, 100))
     screen.blit(lbl_d, (WIDTH//2 - lbl_d.get_width()//2, 180))
 
@@ -175,7 +175,7 @@ def draw_notes(screen):
     
     y = 100
     for l in lines:
-        surf = FONT_MEDIUM.render(l, True, WHITE)
+        surf = FONT_MEDIUM.render(l, False, WHITE)
         screen.blit(surf, (WIDTH//2 - surf.get_width()//2, y))
         y += 40
 
