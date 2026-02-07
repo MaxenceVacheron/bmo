@@ -221,12 +221,14 @@ def draw_notes(draw):
 def draw_heart(draw, pulse):
     """Artistic Pulsing Heart with Glow"""
     cx, cy = 240, 160
+    # Use a more organic pulse rhythm (double beat)
     base_size = int(80 + pulse * 25)
     
-    # Draw Inner Glow
-    for i in range(3):
-        gs = base_size + (i * 10)
-        draw.ellipse([cx-gs, cy-gs, cx+gs, cy+gs], outline=(255, 180, 200, 50), width=2)
+    # Draw Inner Glow (only at peak pulse)
+    if pulse > 0.6:
+        for i in range(2):
+            gs = base_size + (i * 15)
+            draw.ellipse([cx-gs, cy-gs, cx+gs, cy+gs], outline=(255, 180, 200, 40), width=2)
 
     # Simplified Vector Heart
     draw.ellipse([cx-base_size, cy-base_size, cx, cy], fill=PINK)
@@ -235,6 +237,7 @@ def draw_heart(draw, pulse):
     
     # Minimalist text
     draw.text((195, 145), "MINE", fill=WHITE, font=FONT_MEDIUM)
+
 
 
 
@@ -307,10 +310,12 @@ def main():
             
             # 6. Heart animation (pulses every frame)
             if state["current_mode"] == "HEART":
-                # Cap animation to ~20 FPS to avoid SPI saturation
-                if now - state["touch_time"] > 0.05: 
+                # Lower FPS for the heart (12 FPS = ~0.083s) 
+                # Very stable for SPI screens and looks more like a real heartbeat
+                if now - state["touch_time"] > 0.08: 
                     should_render = True
-                    state["touch_time"] = now # Reuse touch_time as a frame timer
+                    state["touch_time"] = now
+
 
             
             # 7. Manual redraw flag
@@ -349,11 +354,11 @@ def main():
                 elif state["current_mode"] == "NOTES":
                     draw_notes(draw)
                 if state["current_mode"] == "HEART":
-                    # Beating heart effect
-                    pulse = abs(np.sin(now * 4))
-                    draw_heart(draw, pulse)
-                    # HUD Diagnostic (Simple)
-                    draw.text((10, 290), state["debug_info"], fill=WHITE, font=FONT_SMALL)
+                    # Beating heart effect (Organic double-thump Lub-Dub)
+                    t = now * 1.5 # Speed adjustment
+                    pulse = (abs(np.sin(t * np.pi)) ** 30) * 0.5 + (abs(np.sin(t * np.pi - 1.5)) ** 30) * 1.0
+                    draw_heart(draw, min(pulse, 1.2))
+
                 
                 # 3. Menu Button (Global Floating Design)
                 if state["current_mode"] != "MENU":
@@ -371,13 +376,11 @@ def main():
                 # 4. Write to framebuffer ONLY IF data changed
                 new_data = convert_to_rgb565(img)
                 if new_data != state["last_rendered_data"]:
-                    write_start = time.time()
                     fb.write(new_data)
                     fb.seek(0)
                     fb.flush()
-                    write_time = (time.time() - write_start) * 1000
-                    state["debug_info"] = f"SPI Write: {write_time:.1f}ms"
                     state["last_rendered_data"] = new_data
+
 
 
             
