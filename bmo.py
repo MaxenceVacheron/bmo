@@ -56,9 +56,10 @@ state = {
     "touch_pos": None,
     "touch_time": 0,
     "last_rendered_data": None,
-    "needs_redraw": True,  # Flag to trigger redraws only when needed
+    "needs_redraw": True,
     "last_mode": None,
-    "last_stats_update": 0,  # For periodic stats refresh
+    "last_stats_update": 0,
+    "last_time_update": "", # Track time change
 }
 
 # --- TOUCH LOGIC (Y-INVERSION FIXED) ---
@@ -67,39 +68,49 @@ def touch_thread():
     try:
         dev = InputDevice(TOUCH_DEVICE)
         raw_x, raw_y = 0, 0
+        finger_down = False
         for event in dev.read_loop():
+            # Coordinate tracking
             if event.type == ecodes.EV_ABS:
                 if event.code == ecodes.ABS_X: raw_x = event.value
                 if event.code == ecodes.ABS_Y: raw_y = event.value
             
+            # Touch tracking
             if event.type == ecodes.EV_KEY and event.code == ecodes.BTN_TOUCH:
-                if event.value == 1: # Finger Down
-                    # CALIBRATION: Swapped axes + Double Inversion
+                finger_down = (event.value == 1)
+            
+            # SYN_REPORT means the packet (coordinations + touch state) is complete
+            if event.type == ecodes.EV_SYN and event.code == ecodes.SYN_REPORT:
+                if finger_down:
+                    # CALCULATE with the synchronized coordinates
                     sx = WIDTH - ((raw_y / 4095) * WIDTH)
-                    # FLIPPING Y HERE:
                     sy = (raw_x / 4095) * HEIGHT 
                     
-                    state["touch_pos"] = (sx, sy)
-                    state["touch_time"] = time.time()
-                    state["needs_redraw"] = True  # Trigger redraw on touch
-                    
-                    # HITBOX: Menu Button (Top Right)
-                    if sx > 380 and sy < 80:
-                        new_mode = "MENU" if state["current_mode"] != "MENU" else "FACE"
-                        if new_mode != state["current_mode"]:
-                            state["current_mode"] = new_mode
-                            state["needs_redraw"] = True
-                    
-                    # HITBOX: Menu Options
-                    elif state["current_mode"] == "MENU":
-                        new_mode = None
-                        if 100 < sy < 160: new_mode = "FACE"
-                        elif 160 < sy < 220: new_mode = "STATS"
-                        elif 220 < sy < 280: new_mode = "MESSAGE"
+                    # If this is the start of a touch (pos was None)
+                    if state["touch_pos"] is None:
+                        state["touch_pos"] = (sx, sy)
+                        state["touch_time"] = time.time()
+                        state["needs_redraw"] = True
                         
-                        if new_mode and new_mode != state["current_mode"]:
+                        # HITBOXES
+                        if sx > 380 and sy < 80:
+                            new_mode = "MENU" if state["current_mode"] != "MENU" else "FACE"
                             state["current_mode"] = new_mode
                             state["needs_redraw"] = True
+                        
+                        elif state["current_mode"] == "MENU":
+                            new_mode = None
+                            if 100 < sy < 140: new_mode = "FACE"
+                            elif 140 < sy < 180: new_mode = "STATS"
+                            elif 180 < sy < 220: new_mode = "MESSAGE"
+                            elif 220 < sy < 260: new_mode = "CLOCK"
+                            
+                            if new_mode:
+                                state["current_mode"] = new_mode
+                                state["needs_redraw"] = True
+                else:
+                    # Finger released
+                    pass
 
     except Exception as e: print(f"Touch Error: {e}")
 
@@ -113,6 +124,11 @@ def draw_face(draw, expr):
         draw.ellipse([100, 70, 160, 170], fill=BLACK)
         draw.ellipse([320, 70, 380, 170], fill=BLACK)
         draw.ellipse([210, 200, 270, 260], outline=BLACK, width=5)
+    elif expr == "sleepy":
+        # Closed slanted eyes
+        draw.line([(100, 110), (160, 130)], fill=BLACK, width=8)
+        draw.line([(320, 130), (380, 110)], fill=BLACK, width=8)
+        draw.arc([210, 210, 270, 230], start=0, end=180, fill=BLACK, width=4)
 
 def draw_stats(draw):
     """Draw BMO Internal Health screen with CPU temp and RAM usage"""
@@ -177,6 +193,14 @@ def draw_message(draw):
     draw.text((120, 180), "From your friend,", fill=BLACK, font=FONT_SMALL)
     draw.text((140, 210), "with love ♥", fill=(200, 50, 100), font=FONT_MEDIUM)
 
+def draw_clock(draw):
+    """Draw a large digital clock with a sleepy face"""
+    draw_face(draw, "sleepy")
+    current_time = time.strftime("%H:%M")
+    # Draw time in middle
+    draw.text((160, 150), current_time, fill=BLACK, font=FONT_LARGE)
+    draw.text((170, 30), "BMO SLEEPY TIME", fill=BLACK, font=FONT_SMALL)
+
 def convert_to_rgb565(pil_img):
     im_array = np.array(pil_img).astype(np.uint16)
     r, g, b = (im_array[:,:,0] >> 3) << 11, (im_array[:,:,1] >> 2) << 5, (im_array[:,:,2] >> 3)
@@ -236,7 +260,14 @@ def main():
                     state["last_stats_update"] = now
                     should_render = True
             
-            # 5. Manual redraw flag
+            # 5. Clock mode updates every minute
+            if state["current_mode"] == "CLOCK":
+                t_str = time.strftime("%H:%M")
+                if t_str != state["last_time_update"]:
+                    state["last_time_update"] = t_str
+                    should_render = True
+            
+            # 6. Manual redraw flag
             if state["needs_redraw"]:
                 should_render = True
                 state["needs_redraw"] = False
@@ -250,22 +281,21 @@ def main():
                 # 2. Render content based on mode
                 if state["current_mode"] == "FACE":
                     draw_face(draw, state["expression"])
-                    # Menu button indicator
-                    draw.rectangle([380, 10, 470, 70], outline=BLACK, width=2)
-                    draw.text((395, 30), "MENU", fill=BLACK, font=FONT_SMALL)
                 elif state["current_mode"] == "MENU":
                     draw.rectangle([50, 50, 430, 270], fill=(60, 80, 75), outline=WHITE, width=2)
-                    draw.text((100, 120), "> 1. BACK TO FACE", fill=WHITE, font=FONT_SMALL)
-                    draw.text((100, 170), "> 2. SYSTEM STATS", fill=WHITE, font=FONT_SMALL)
-                    draw.text((100, 220), "> 3. MESSAGE CENTER", fill=WHITE, font=FONT_SMALL)
+                    draw.text((80, 105), "> 1. BACK TO FACE", fill=WHITE, font=FONT_SMALL)
+                    draw.text((80, 145), "> 2. SYSTEM STATS", fill=WHITE, font=FONT_SMALL)
+                    draw.text((80, 185), "> 3. MESSAGE CENTER", fill=WHITE, font=FONT_SMALL)
+                    draw.text((80, 225), "> 4. BMO CLOCK", fill=WHITE, font=FONT_SMALL)
                 elif state["current_mode"] == "STATS":
                     draw_stats(draw)
-                    # Menu button indicator
-                    draw.rectangle([380, 10, 470, 70], outline=BLACK, width=2)
-                    draw.text((395, 30), "MENU", fill=BLACK, font=FONT_SMALL)
                 elif state["current_mode"] == "MESSAGE":
                     draw_message(draw)
-                    # Menu button indicator
+                elif state["current_mode"] == "CLOCK":
+                    draw_clock(draw)
+                
+                # Menu button indicator for all non-menu modes
+                if state["current_mode"] != "MENU":
                     draw.rectangle([380, 10, 470, 70], outline=BLACK, width=2)
                     draw.text((395, 30), "MENU", fill=BLACK, font=FONT_SMALL)
 
