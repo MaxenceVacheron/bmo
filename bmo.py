@@ -14,7 +14,7 @@ except:
 # --- CONFIG ---
 WIDTH, HEIGHT = 480, 320
 FB_DEVICE = "/dev/fb0" # Swapped after GPU activation
-TOUCH_DEVICE = "/dev/input/event4" 
+TOUCH_DEVICE = "/dev/input/event6" # Changed after reboot (Check dmesg)
 BLACK = (20, 24, 28)    # Deep Slate instead of pure black
 WHITE = (245, 247, 250)  # Off-white for better contrast
 PINK = (255, 148, 178)   # Signature blush / heart color
