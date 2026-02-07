@@ -116,9 +116,9 @@ def touch_thread():
                         state["touch_time"] = time.time()
                         state["needs_redraw"] = True
                         
-                        # Hitbox Menu Button
-                        if sx > 380 and sy < 80:
-                            state["current_mode"] = "MENU" if state["current_mode"] != "MENU" else "FACE"
+                        # Hitbox Menu Button (NOW ANYWHERE ON FACE)
+                        if state["current_mode"] == "FACE":
+                            state["current_mode"] = "MENU"
                             state["needs_redraw"] = True
                         
                         # Hitbox Menu Options
@@ -132,14 +132,8 @@ def touch_thread():
                                 state["current_mode"] = "NOTES"
                                 state["love_note"] = random.choice(LOVE_NOTES)
                             elif 80 + 5*item_h < sy < 80 + 6*item_h: state["current_mode"] = "HEART"
-                            elif 80 + 6*item_h < sy < 80 + 7*item_h: state["current_mode"] = "DESKTOP"
+                            # Removed DESKTOP mode
                             state["needs_redraw"] = True
-                        
-                        # Hidden area to leave deskop mode (Top Right)
-                        elif state["current_mode"] == "DESKTOP":
-                            if sx > 400 and sy < 80:
-                                state["current_mode"] = "MENU"
-                                state["needs_redraw"] = True
                 else:
 
                     state["touch_pos"] = None # Reset on release
@@ -313,7 +307,7 @@ def main():
                 elif state["current_mode"] == "MENU":
                     draw.rectangle([40, 20, 440, 310], fill=WHITE, outline=BLACK, width=6)
                     draw.text((70, 35), "SELECT MODE", fill=BLACK, font=FONT_MEDIUM)
-                    options = ["1. FACE", "2. STATS", "3. WISH", "4. CLOCK", "5. NOTES", "6. HEART", "7. DESKTOP"]
+                    options = ["1. FACE", "2. STATS", "3. WISH", "4. CLOCK", "5. NOTES", "6. HEART"]
                     for i, opt in enumerate(options):
                         draw.text((80, 90 + i*30), opt, fill=BLACK, font=FONT_SMALL)
                 elif state["current_mode"] == "STATS":
@@ -330,15 +324,8 @@ def main():
                     t = now * 1.5
                     pulse = (abs(np.sin(t * np.pi)) ** 30) * 0.5 + (abs(np.sin(t * np.pi - 1.5)) ** 30) * 1.0
                     draw_heart(draw, min(pulse, 1.2))
-                elif state["current_mode"] == "DESKTOP":
-                    # BMO stops writing to FB. Mirror tool will show through.
-                    img = None 
+                # Global Menu Button (Arcade Style) REMOVED
 
-                
-                # Global Menu Button (Arcade Style)
-                if state["current_mode"] != "MENU" and img:
-                    draw.ellipse([400, 20, 460, 80], fill=WHITE, outline=BLACK, width=4)
-                    draw.text((418, 38), "M", fill=BLACK, font=FONT_SMALL)
 
                 # 3. Filter and Write
                 if img:
