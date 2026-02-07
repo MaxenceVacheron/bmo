@@ -15,18 +15,22 @@ except:
 WIDTH, HEIGHT = 480, 320
 FB_DEVICE = "/dev/fb1"
 TOUCH_DEVICE = "/dev/input/event4" 
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
+BLACK = (20, 24, 28)    # Deep Slate instead of pure black
+WHITE = (245, 247, 250)  # Off-white for better contrast
+PINK = (255, 148, 178)   # Signature blush / heart color
 
-# BMO Palettes (Randomized on start)
-PALETTES = [
-    (145, 201, 178), # Original Green
-    (255, 200, 200), # Pale Red
-    (200, 220, 255), # Soft Blue
-    (240, 230, 140), # BMO Yellow
-    (220, 180, 255), # Lumpy Purple
+# Premium Themes
+THEMES = [
+    {"bg": (145, 201, 178), "accent": (115, 171, 148)}, # Original Mint
+    {"bg": (255, 190, 190), "accent": (235, 160, 160)}, # Sakura
+    {"bg": (178, 212, 255), "accent": (148, 182, 225)}, # Sky
+    {"bg": (250, 230, 170), "accent": (220, 200, 140)}, # Honey
+    {"bg": (210, 190, 255), "accent": (180, 160, 225)}, # Lavender
 ]
-BMO_COLOR = random.choice(PALETTES)
+active_theme = random.choice(THEMES)
+BMO_COLOR = active_theme["bg"]
+ACCENT_COLOR = active_theme["accent"]
+
 
 
 # --- SYSTEM MONITORING ---
@@ -135,62 +139,48 @@ def touch_thread():
 
 # --- DRAWING MODES ---
 def draw_face(draw, expr):
+    # Rosy Cheeks (Blush) - ALWAYS THERE BUT FADES
+    draw.ellipse([80, 150, 110, 170], fill=(255, 180, 200))
+    draw.ellipse([370, 150, 400, 170], fill=(255, 180, 200))
+    
     if expr == "happy":
-        draw.ellipse([110, 90, 150, 150], fill=BLACK)
-        draw.ellipse([330, 90, 370, 150], fill=BLACK)
-        draw.line([(220, 210), (240, 230), (260, 210)], fill=BLACK, width=6)
+        draw.ellipse([115, 90, 145, 150], fill=BLACK)
+        draw.ellipse([335, 90, 365, 150], fill=BLACK)
+        # Small cute smile
+        draw.arc([220, 200, 260, 230], start=0, end=180, fill=BLACK, width=4)
     elif expr == "surprised":
-        draw.ellipse([100, 70, 160, 170], fill=BLACK)
-        draw.ellipse([320, 70, 380, 170], fill=BLACK)
-        draw.ellipse([210, 200, 270, 260], outline=BLACK, width=5)
+        draw.ellipse([110, 80, 150, 160], fill=BLACK)
+        draw.ellipse([330, 80, 370, 160], fill=BLACK)
+        draw.ellipse([220, 200, 260, 240], outline=BLACK, width=4)
     elif expr == "sleepy":
-        # Closed slanted eyes
-        draw.line([(100, 110), (160, 130)], fill=BLACK, width=8)
-        draw.line([(320, 130), (380, 110)], fill=BLACK, width=8)
-        draw.arc([210, 210, 270, 230], start=0, end=180, fill=BLACK, width=4)
+        # Zen slanted eyes
+        draw.line([(110, 120), (160, 115)], fill=BLACK, width=6)
+        draw.line([(320, 115), (370, 120)], fill=BLACK, width=6)
+        draw.line([(220, 210), (260, 210)], fill=BLACK, width=3)
 
 def draw_stats(draw):
-    """Draw BMO Internal Health screen with CPU temp and RAM usage"""
-    # Title
-    draw.text((70, 20), "BMO INTERNAL HEALTH", fill=BLACK, font=FONT_MEDIUM)
+    """Modern Dashboard style stats"""
+    draw.text((60, 40), "SYSTEM VITALS", fill=BLACK, font=FONT_MEDIUM)
     
-    # CPU Temperature Bar
-    cpu_temp = get_cpu_temp()
-    draw.text((50, 80), "CORE TEMPERATURE", fill=BLACK, font=FONT_SMALL)
-    
-    # Temperature bar (0-80°C range)
-    bar_x, bar_y, bar_w, bar_h = 50, 110, 320, 30
-    draw.rectangle([bar_x, bar_y, bar_x + bar_w, bar_y + bar_h], outline=BLACK, width=2)
-    
-    # Color coding: green (0-50), yellow (50-65), red (65+)
-    temp_ratio = min(cpu_temp / 80.0, 1.0)
-    fill_width = int(bar_w * temp_ratio)
-    if cpu_temp < 50:
-        temp_color = (50, 200, 100)
-    elif cpu_temp < 65:
-        temp_color = (255, 200, 50)
-    else:
-        temp_color = (255, 80, 80)
-    
-    if fill_width > 0:
-        draw.rectangle([bar_x + 2, bar_y + 2, bar_x + fill_width - 2, bar_y + bar_h - 2], fill=temp_color)
-    
-    draw.text((bar_x + bar_w + 10, bar_y + 5), f"{cpu_temp:.1f}°C", fill=BLACK, font=FONT_SMALL)
-    
-    # RAM Usage Bar
-    ram_usage = get_ram_usage()
-    draw.text((50, 170), "MEMORY ENERGY", fill=BLACK, font=FONT_SMALL)
-    
-    bar_y = 200
-    draw.rectangle([bar_x, bar_y, bar_x + bar_w, bar_y + bar_h], outline=BLACK, width=2)
-    
-    # Energy bar style - darker BMO green for used portion
-    ram_ratio = min(ram_usage / 100.0, 1.0)
-    fill_width = int(bar_w * ram_ratio)
-    if fill_width > 0:
-        draw.rectangle([bar_x + 2, bar_y + 2, bar_x + fill_width - 2, bar_y + bar_h - 2], fill=(80, 140, 120))
-    
-    draw.text((bar_x + bar_w + 10, bar_y + 5), f"{ram_usage:.1f}%", fill=BLACK, font=FONT_SMALL)
+    # CPU Gauge
+    temp = get_cpu_temp()
+    draw.text((60, 90), "CORE TEMP", fill=ACCENT_COLOR, font=FONT_SMALL)
+    # Background pill
+    draw.rounded_rectangle([60, 115, 420, 135], radius=10, fill=(255, 255, 255, 100), outline=BLACK, width=1)
+    # Fill pill
+    w = int(360 * min(temp/80, 1))
+    color = (80, 200, 120) if temp < 55 else (255, 150, 50)
+    if w > 4: draw.rounded_rectangle([62, 117, 60+w, 133], radius=8, fill=color)
+    draw.text((360, 90), f"{temp:.1f}°C", fill=BLACK, font=FONT_SMALL)
+
+    # RAM Gauge
+    ram = get_ram_usage()
+    draw.text((60, 170), "MEMORY LOAD", fill=ACCENT_COLOR, font=FONT_SMALL)
+    draw.rounded_rectangle([60, 195, 420, 215], radius=10, fill=(255, 255, 255, 100), outline=BLACK, width=1)
+    w = int(360 * (ram/100))
+    if w > 4: draw.rounded_rectangle([62, 197, 60+w, 213], radius=8, fill=(100, 150, 255))
+    draw.text((360, 170), f"{ram:.1f}%", fill=BLACK, font=FONT_SMALL)
+
 
 def draw_message(draw):
     """Draw personalized message center"""
@@ -213,28 +203,37 @@ def draw_message(draw):
     draw.text((140, 210), "with love ♥", fill=(200, 50, 100), font=FONT_MEDIUM)
 
 def draw_clock(draw):
-    """Draw a large digital clock with a sleepy face"""
-    draw_face(draw, "sleepy")
+    """Minimal Modern Clock"""
     current_time = time.strftime("%H:%M")
-    draw.text((160, 150), current_time, fill=BLACK, font=FONT_LARGE)
+    # Centered High-impact time
+    draw.text((120, 110), current_time, fill=BLACK, font=FONT_LARGE)
+    draw.text((125, 160), time.strftime("%A, %b %d"), fill=ACCENT_COLOR, font=FONT_SMALL)
 
 def draw_notes(draw):
-    """Display random sweet notes"""
+    """Premium Card Note"""
     draw_face(draw, "happy")
-    draw.rectangle([40, 180, 440, 280], fill=WHITE, outline=BLACK, width=2)
-    draw.text((80, 210), state["love_note"], fill=BLACK, font=FONT_MEDIUM)
+    # Floating Glass Card
+    draw.rounded_rectangle([40, 180, 440, 280], radius=20, fill=(255, 255, 255, 180), outline=BLACK, width=2)
+    draw.text((70, 215), state["love_note"], fill=BLACK, font=FONT_MEDIUM)
 
 def draw_heart(draw, pulse):
-    """Draw a large pulsing heart"""
-    size = int(100 + pulse * 20)
-    cx, cy = 240, 180
-    # Simple heart shape using polygons and circles
-    draw.ellipse([cx-size, cy-size, cx, cy], fill=(255, 100, 150))
-    draw.ellipse([cx, cy-size, cx+size, cy], fill=(255, 100, 150))
-    draw.polygon([(cx-size, cy-size//4), (cx+size, cy-size//4), (cx, cy+size)], fill=(255, 100, 150))
-    # Heart text
-    draw.text((185, 160), "I LOVE", fill=WHITE, font=FONT_SMALL)
-    draw.text((195, 190), "YOU!", fill=WHITE, font=FONT_MEDIUM)
+    """Artistic Pulsing Heart with Glow"""
+    cx, cy = 240, 160
+    base_size = int(80 + pulse * 25)
+    
+    # Draw Inner Glow
+    for i in range(3):
+        gs = base_size + (i * 10)
+        draw.ellipse([cx-gs, cy-gs, cx+gs, cy+gs], outline=(255, 180, 200, 50), width=2)
+
+    # Simplified Vector Heart
+    draw.ellipse([cx-base_size, cy-base_size, cx, cy], fill=PINK)
+    draw.ellipse([cx, cy-base_size, cx+base_size, cy], fill=PINK)
+    draw.polygon([(cx-base_size, cy-base_size//2), (cx+base_size, cy-base_size//2), (cx, cy+base_size)], fill=PINK)
+    
+    # Minimalist text
+    draw.text((195, 145), "MINE", fill=WHITE, font=FONT_MEDIUM)
+
 
 
 def convert_to_rgb565(pil_img):
@@ -323,16 +322,18 @@ def main():
                 if state["current_mode"] == "FACE":
                     draw_face(draw, state["expression"])
                 elif state["current_mode"] == "MENU":
-                    draw.rectangle([50, 40, 430, 300], fill=(60, 80, 75), outline=WHITE, width=2)
-                    draw.text((80, 50), "BMO MENU", fill=WHITE, font=FONT_SMALL)
-                    item_h = 35
-                    y = 80
-                    draw.text((80, y), "> 1. FACE", fill=WHITE, font=FONT_SMALL)
-                    draw.text((80, y + item_h), "> 2. HEALTH STATS", fill=WHITE, font=FONT_SMALL)
-                    draw.text((80, y + 2*item_h), "> 3. BIRTHDAY NOTE", fill=WHITE, font=FONT_SMALL)
-                    draw.text((80, y + 3*item_h), "> 4. CLOCK", fill=WHITE, font=FONT_SMALL)
-                    draw.text((80, y + 4*item_h), "> 5. LOVE NOTES", fill=WHITE, font=FONT_SMALL)
-                    draw.text((80, y + 5*item_h), "> 6. HEARTBEAT", fill=WHITE, font=FONT_SMALL)
+                    # Glassmorphism Card
+                    draw.rounded_rectangle([40, 30, 440, 300], radius=25, fill=(255, 255, 255, 220), outline=BLACK, width=2)
+                    draw.text((170, 45), "BMO DASH", fill=ACCENT_COLOR, font=FONT_SMALL)
+                    
+                    item_h = 40
+                    y_start = 85
+                    options = ["DASHBOARD", "HEALTH", "BIRTHDAY", "CLOCK", "NOTES", "HEART"]
+                    for i, opt in enumerate(options):
+                        # Selector dot
+                        draw.ellipse([70, y_start + i*item_h + 10, 80, y_start + i*item_h + 20], fill=ACCENT_COLOR)
+                        draw.text((100, y_start + i*item_h), opt, fill=BLACK, font=FONT_SMALL)
+
                 elif state["current_mode"] == "STATS":
                     draw_stats(draw)
                 elif state["current_mode"] == "MESSAGE":
@@ -346,10 +347,11 @@ def main():
                     pulse = abs(np.sin(now * 4))
                     draw_heart(draw, pulse)
                 
-                # 3. Menu Button (Global)
+                # 3. Menu Button (Global Floating Design)
                 if state["current_mode"] != "MENU":
-                    draw.rectangle([380, 10, 470, 70], outline=BLACK, width=2)
-                    draw.text((395, 30), "MENU", fill=BLACK, font=FONT_SMALL)
+                    draw.rounded_rectangle([390, 15, 465, 65], radius=15, outline=BLACK, width=2, fill=(255, 255, 255, 150))
+                    draw.text((405, 30), "•••", fill=BLACK, font=FONT_SMALL)
+
 
 
 
