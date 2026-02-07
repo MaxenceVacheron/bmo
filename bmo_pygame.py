@@ -84,24 +84,27 @@ def touch_thread():
         raw_x, raw_y = 0, 0
         current_touch_id = None
         
+        last_finger_state = False
+        finger_down = False
+        
         for event in dev.read_loop():
             if event.type == ecodes.EV_ABS:
                 if event.code == ecodes.ABS_X: raw_x = event.value
                 if event.code == ecodes.ABS_Y: raw_y = event.value
             
             elif event.type == ecodes.EV_KEY and event.code == ecodes.BTN_TOUCH:
-                if event.value == 1: # Touch Down
-                    # Calibrate coordinates (Swap X/Y + Invert Y logic matches current bmo.py)
-                    # From bmo.py: sx = WIDTH - ((raw_y / 4095) * WIDTH)
-                    #              sy = (raw_x / 4095) * HEIGHT 
+                finger_down = (event.value == 1)
+            
+            elif event.type == ecodes.EV_SYN and event.code == ecodes.SYN_REPORT:
+                if finger_down and not last_finger_state:
+                    # New Touch Detected!
                     sx = WIDTH - ((raw_y / 4095.0) * WIDTH)
                     sy = (raw_x / 4095.0) * HEIGHT
-                    
-                    # Post Pygame Event
                     pygame.event.post(pygame.event.Event(pygame.MOUSEBUTTONDOWN, {'pos': (int(sx), int(sy)), 'button': 1}))
-                    
+                
+                last_finger_state = finger_down
     except Exception as e:
-        print(f"Touch Input Error: {e}")
+        print(f"Touch Error: {e}")
 
 # --- DRAWING FUNCTIONS ---
 def draw_face(screen):
