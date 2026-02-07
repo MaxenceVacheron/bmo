@@ -1,0 +1,11 @@
+[Unit]
+Description=BMO Framebuffer Mirror (Desktop to SPI)
+After=display-manager.service
+
+[Service]
+ExecStart=/home/pi/bmo/mirror
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
