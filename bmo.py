@@ -15,7 +15,7 @@ except:
 WIDTH, HEIGHT = 480, 320
 FB_DEVICE = "/dev/fb1"
 TOUCH_DEVICE = "/dev/input/event4" 
-BMO_GREEN = (255, 180, 180)  # Pale red for deployment verification
+BMO_GREEN = (145, 201, 178) # Original BMO Green
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 
@@ -187,6 +187,23 @@ def main():
     threading.Thread(target=touch_thread, daemon=True).start()
     
     with open(FB_DEVICE, "wb") as fb:
+        # --- STARTUP ANIMATION: BMO SAYS HELLO ---
+        for frame in range(40):  # ~2 seconds at 20fps
+            img = Image.new('RGB', (WIDTH, HEIGHT), BMO_GREEN)
+            draw = ImageDraw.Draw(img)
+            
+            # Draw Face
+            draw_face(draw, "happy")
+            
+            # Hello Text with slight bounce
+            bounce = int(np.sin(frame * 0.4) * 5)
+            draw.text((180, 50 + bounce), "HELLO!", fill=BLACK, font=FONT_LARGE)
+            
+            fb.write(convert_to_rgb565(img))
+            fb.seek(0)
+            fb.flush()
+            time.sleep(0.05)
+        
         while True:
             now = time.time()
             should_render = False
