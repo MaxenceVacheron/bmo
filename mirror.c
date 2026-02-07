@@ -6,61 +6,63 @@
 #include <sys/ioctl.h>
 #include <linux/fb.h>
 #include <string.h>
-#include <time.h>
 
 int main() {
-    int f0 = open("/dev/fb0", O_RDONLY);
+    // On cherche les deux framebuffers
+    int f0 = open("/dev/fb0", O_RDWR);
     int f1 = open("/dev/fb1", O_RDWR);
-    if (f0 < 0 || f1 < 0) {
-        perror("Error opening framebuffers");
-        return 1;
-    }
-
-    struct fb_var_screeninfo v0, v1;
-    if (ioctl(f0, FBIOGET_VSCREENINFO, &v0) < 0) {
-        perror("ioctl fb0 failed");
-        return 1;
-    }
     
-    // If ioctl on fb1 fails, we use safe defaults for the known hardware
-    if (ioctl(f1, FBIOGET_VSCREENINFO, &v1) < 0 || v1.xres == 0) {
-        fprintf(stderr, "Warning: ioctl fb1 failed or returned 0, using defaults (480x320)\n");
-        v1.xres = 480;
-        v1.yres = 320;
-        v1.bits_per_pixel = 16;
+    if (f0 < 0) { perror("FB0 missing"); return 1; }
+    
+    struct fb_var_screeninfo v0, v1;
+    ioctl(f0, FBIOGET_VSCREENINFO, &v0);
+    
+    int src_fd, dst_fd;
+    struct fb_var_screeninfo *src_v, *dst_v;
+
+    // Détection auto : celui qui a le nom "ili" ou "tft" est la destination
+    // Sinon on se base sur le fait que le GPU est souvent en 32bpp et l'écran en 16bpp
+    if (v0.bits_per_pixel == 16) {
+        printf("Detected SPI Screen on FB0, GPU on FB1 (or missing)\n");
+        dst_fd = f0; src_fd = f1;
+    } else {
+        printf("Detected GPU on FB0, SPI Screen on FB1\n");
+        src_fd = f0; dst_fd = f1;
     }
 
-    printf("FB0: %dx%d, %dbpp\n", v0.xres, v0.yres, v0.bits_per_pixel);
-    printf("FB1: %dx%d, %dbpp\n", v1.xres, v1.yres, v1.bits_per_pixel);
+    if (src_fd < 0) {
+        printf("Error: GPU framebuffer not found. Make sure hdmi_force_hotplug=1 is in config.txt\n");
+        return 1;
+    }
+
+    ioctl(src_fd, FBIOGET_VSCREENINFO, &v0);
+    ioctl(dst_fd, FBIOGET_VSCREENINFO, &v1);
 
     size_t s0 = v0.xres * v0.yres * (v0.bits_per_pixel / 8);
-    size_t s1 = v1.xres * v1.yres * (v1.bits_per_pixel / 8);
+    size_t s1 = 480 * 320 * 2; // Forcer taille SPI 3.5"
 
-    unsigned char *m0 = mmap(NULL, s0, PROT_READ, MAP_SHARED, f0, 0);
-    unsigned char *m1 = mmap(NULL, s1, PROT_WRITE | PROT_READ, MAP_SHARED, f1, 0);
+    unsigned char *m0 = mmap(NULL, s0, PROT_READ, MAP_SHARED, src_fd, 0);
+    unsigned char *m1 = mmap(NULL, s1, PROT_WRITE, MAP_SHARED, dst_fd, 0);
 
     if (m0 == MAP_FAILED || m1 == MAP_FAILED) {
         perror("mmap failed");
         return 1;
     }
 
+    printf("Mirroring started: %dx%d (%dbpp) -> 480x320 (16bpp)\n", v0.xres, v0.yres, v0.bits_per_pixel);
+
     while (1) {
-        // Just direct copy if both are 16-bit or dimensions match
-        if (v0.bits_per_pixel == v1.bits_per_pixel && v0.xres == v1.xres) {
-            memcpy(m1, m0, s1 < s0 ? s1 : s0);
-        } 
-        else if (v0.bits_per_pixel == 32 && v1.bits_per_pixel == 16) {
+        if (v0.bits_per_pixel == 32) {
             unsigned int *src = (unsigned int *)m0;
             unsigned short *dst = (unsigned short *)m1;
-            for (int i = 0; i < v1.xres * v1.yres; i++) {
+            for (int i = 0; i < 480 * 320; i++) {
                 unsigned int p = src[i];
-                unsigned char r = (p >> 16) & 0xFF;
-                unsigned char g = (p >> 8) & 0xFF;
-                unsigned char b = p & 0xFF;
-                dst[i] = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
+                dst[i] = (((p >> 16) & 0xF8) << 8) | (((p >> 8) & 0xFC) << 3) | (p >> 3 & 0x1F);
             }
+        } else {
+            memcpy(m1, m0, s1);
         }
-        usleep(33000); // ~30 FPS
+        usleep(16000); // ~60 FPS
     }
     return 0;
 }
