@@ -215,6 +215,7 @@ def main():
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = event.pos
+                state["last_touch_pos"] = (x, y) # Store for debug crosshair
                 state["last_interaction"] = time.time()
                 
                 if state["mode"] == "FACE":
@@ -236,6 +237,16 @@ def main():
         elif state["mode"] == "CLOCK": draw_clock(screen)
         elif state["mode"] == "NOTES": draw_notes(screen)
         elif state["mode"] == "HEART": draw_heart(screen)
+        
+        # --- DEBUG: TOUCH CROSSHAIR ---
+        # Draw a cross at the last registered touch position to verify calibration
+        if "last_touch_pos" in state:
+            tx, ty = state["last_touch_pos"]
+            # Draw distinct crosshair (Black with White outline for visibility on any background)
+            pygame.draw.line(screen, WHITE, (tx-10, ty), (tx+10, ty), 3)
+            pygame.draw.line(screen, WHITE, (tx, ty-10), (tx, ty+10), 3)
+            pygame.draw.line(screen, BLACK, (tx-10, ty), (tx+10, ty), 1)
+            pygame.draw.line(screen, BLACK, (tx, ty-10), (tx, ty+10), 1)
         
         # Blit to Framebuffer (Zero Copy optimization possible?)
         # Pygame surface buffer is memory view.
