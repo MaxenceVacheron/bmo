@@ -15,9 +15,19 @@ except:
 WIDTH, HEIGHT = 480, 320
 FB_DEVICE = "/dev/fb1"
 TOUCH_DEVICE = "/dev/input/event4" 
-BMO_GREEN = (145, 201, 178) # Original BMO Green
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
+
+# BMO Palettes (Randomized on start)
+PALETTES = [
+    (145, 201, 178), # Original Green
+    (255, 200, 200), # Pale Red
+    (200, 220, 255), # Soft Blue
+    (240, 230, 140), # BMO Yellow
+    (220, 180, 255), # Lumpy Purple
+]
+BMO_COLOR = random.choice(PALETTES)
+
 
 # --- SYSTEM MONITORING ---
 _stats_cache = {"cpu_temp": 0, "ram_usage": 0, "last_update": 0}
@@ -212,23 +222,19 @@ def main():
     
     with open(FB_DEVICE, "wb") as fb:
         # --- STARTUP ANIMATION: BMO SAYS HELLO ---
-        for frame in range(40):  # ~2 seconds at 20fps
-            img = Image.new('RGB', (WIDTH, HEIGHT), BMO_GREEN)
+        for frame in range(40):
+            img = Image.new('RGB', (WIDTH, HEIGHT), BMO_COLOR)
             draw = ImageDraw.Draw(img)
-            
-            # Draw Face
             draw_face(draw, "happy")
-            
-            # Hello Text with slight bounce
             bounce = int(np.sin(frame * 0.4) * 5)
             draw.text((180, 50 + bounce), "HELLO!", fill=BLACK, font=FONT_LARGE)
-            
             fb.write(convert_to_rgb565(img))
             fb.seek(0)
             fb.flush()
             time.sleep(0.05)
         
         while True:
+
             now = time.time()
             should_render = False
             
@@ -275,7 +281,7 @@ def main():
             # Only render if something changed
             if should_render:
                 # 1. Create Frame
-                img = Image.new('RGB', (WIDTH, HEIGHT), BMO_GREEN)
+                img = Image.new('RGB', (WIDTH, HEIGHT), BMO_COLOR)
                 draw = ImageDraw.Draw(img)
                 
                 # 2. Render content based on mode
@@ -299,7 +305,7 @@ def main():
                     draw.rectangle([380, 10, 470, 70], outline=BLACK, width=2)
                     draw.text((395, 30), "MENU", fill=BLACK, font=FONT_SMALL)
 
-                # 3. Animation Overlay (The "Touch Sparkle")
+                # 3. Animation Overlay
                 if state["touch_pos"]:
                     elapsed = now - state["touch_time"]
                     if elapsed < 0.4:
@@ -307,10 +313,14 @@ def main():
                         rad = int(elapsed * 80)
                         draw.ellipse([tx-rad, ty-rad, tx+rad, ty+rad], outline=WHITE, width=2)
 
-                # 4. Write to framebuffer
-                fb.write(convert_to_rgb565(img))
-                fb.seek(0)
-                fb.flush()  # Ensure write completes
+                # 4. Write to framebuffer ONLY IF data changed
+                new_data = convert_to_rgb565(img)
+                if new_data != state["last_rendered_data"]:
+                    fb.write(new_data)
+                    fb.seek(0)
+                    fb.flush()
+                    state["last_rendered_data"] = new_data
+
             
             # Sleep longer when idle to reduce CPU and prevent any flicker
             if should_render:
