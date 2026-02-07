@@ -132,7 +132,11 @@ def touch_thread():
                                 state["current_mode"] = "NOTES"
                                 state["love_note"] = random.choice(LOVE_NOTES)
                             elif 80 + 5*item_h < sy < 80 + 6*item_h: state["current_mode"] = "HEART"
-                            # Removed DESKTOP mode
+                            state["needs_redraw"] = True
+                        
+                        # Return to MENU from any sub-mode
+                        elif state["current_mode"] in ["STATS", "CLOCK", "NOTES", "HEART", "MESSAGE"]:
+                            state["current_mode"] = "MENU"
                             state["needs_redraw"] = True
                 else:
 
