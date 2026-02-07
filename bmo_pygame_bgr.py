@@ -16,11 +16,11 @@ os.environ["SDL_VIDEODRIVER"] = "dummy"
 pygame.init()
 
 # Create Surface matching Framebuffer format (RGB565)
-# Create Surface matching Framebuffer format (RGB565) explicitly
-# R mask: 1111100000000000 (0xF800)
+# Create Surface matching Framebuffer format (BGR565) explicitly
+# R mask: 0000000000011111 (0x001F)
 # G mask: 0000011111100000 (0x07E0)
-# B mask: 0000000000011111 (0x001F)
-screen = pygame.Surface((WIDTH, HEIGHT), depth=16, masks=(0xF800, 0x07E0, 0x001F, 0))
+# B mask: 1111100000000000 (0xF800)
+screen = pygame.Surface((WIDTH, HEIGHT), depth=16, masks=(0x001F, 0x07E0, 0xF800, 0))
 
 # Colors
 BLACK = (20, 24, 28)
