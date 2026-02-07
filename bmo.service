@@ -1,0 +1,14 @@
+[Unit]
+Description=BMO Companion Service
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /home/pi/bmo/bmo.py
+WorkingDirectory=/home/pi/bmo
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target

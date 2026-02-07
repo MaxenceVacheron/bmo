@@ -11,8 +11,14 @@ cd /home/pi/bmo
 echo "📥 Resetting to latest code..."
 git fetch
 git reset --hard origin/main
-echo "🚀 Starting BMO..."
-sudo python3 /home/pi/bmo/bmo.py
+
+if systemctl is-enabled --quiet bmo.service 2>/dev/null; then
+    echo "🔄 Restarting BMO service..."
+    sudo systemctl restart bmo.service
+else
+    echo "🚀 Service not active, starting BMO manually..."
+    sudo python3 /home/pi/bmo/bmo.py
+fi
 EOF
 
 echo "🎮 BMO is running!"
