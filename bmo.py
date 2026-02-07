@@ -61,7 +61,7 @@ def get_ram_usage():
 
 # --- SYSTEM STATE ---
 state = {
-    "current_mode": "DIAGNOSTIC", # Mode for debugging
+    "current_mode": "FACE", 
     "expression": "happy",
     "touch_pos": None,
     "touch_time": 0,
@@ -70,8 +70,19 @@ state = {
     "last_mode": None,
     "last_stats_update": 0,
     "last_time_update": "",
-    "raw_coords": (0, 0), # Track raw values for diagnosis
+    "raw_coords": (0, 0),
+    "love_note": "You are amazing!", # Initial love note
 }
+
+LOVE_NOTES = [
+    "You are amazing!",
+    "BMO loves you! ♥",
+    "Have a great day, cutie!",
+    "You're my favorite human!",
+    "I'm so happy to be yours!",
+    "You look beautiful today!",
+]
+
 
 # --- TOUCH LOGIC (Y-INVERSION FIXED) ---
 def touch_thread():
@@ -89,20 +100,36 @@ def touch_thread():
                 finger_down = (event.value == 1)
             
             if event.type == ecodes.EV_SYN and event.code == ecodes.SYN_REPORT:
-                state["raw_coords"] = (raw_x, raw_y)
                 if finger_down:
                     sx = WIDTH - ((raw_y / 4095) * WIDTH)
                     sy = (raw_x / 4095) * HEIGHT 
                     
-                    # Update position every time for visual tracking
-                    state["touch_pos"] = (sx, sy)
-                    state["touch_time"] = time.time()
-                    state["needs_redraw"] = True
-                    
-                    # HITBOXES DISABLED FOR DIAGNOSIS
+                    # Only process if this is the START of a touch
+                    if state["touch_pos"] is None:
+                        state["touch_pos"] = (sx, sy)
+                        state["touch_time"] = time.time()
+                        state["needs_redraw"] = True
+                        
+                        # Hitbox Menu Button
+                        if sx > 380 and sy < 80:
+                            state["current_mode"] = "MENU" if state["current_mode"] != "MENU" else "FACE"
+                            state["needs_redraw"] = True
+                        
+                        # Hitbox Menu Options
+                        elif state["current_mode"] == "MENU":
+                            item_h = 35
+                            if 80 < sy < 80 + item_h: state["current_mode"] = "FACE"
+                            elif 80 + item_h < sy < 80 + 2*item_h: state["current_mode"] = "STATS"
+                            elif 80 + 2*item_h < sy < 80 + 3*item_h: state["current_mode"] = "MESSAGE"
+                            elif 80 + 3*item_h < sy < 80 + 4*item_h: state["current_mode"] = "CLOCK"
+                            elif 80 + 4*item_h < sy < 80 + 5*item_h: 
+                                state["current_mode"] = "NOTES"
+                                state["love_note"] = random.choice(LOVE_NOTES)
+                            elif 80 + 5*item_h < sy < 80 + 6*item_h: state["current_mode"] = "HEART"
+                            state["needs_redraw"] = True
                 else:
-                    # Keep touch_pos for a moment after release to see it
-                    pass
+                    state["touch_pos"] = None # Reset on release
+                    state["needs_redraw"] = True
 
     except Exception as e: print(f"Touch Error: {e}")
 
@@ -189,9 +216,26 @@ def draw_clock(draw):
     """Draw a large digital clock with a sleepy face"""
     draw_face(draw, "sleepy")
     current_time = time.strftime("%H:%M")
-    # Draw time in middle
     draw.text((160, 150), current_time, fill=BLACK, font=FONT_LARGE)
-    draw.text((170, 30), "BMO SLEEPY TIME", fill=BLACK, font=FONT_SMALL)
+
+def draw_notes(draw):
+    """Display random sweet notes"""
+    draw_face(draw, "happy")
+    draw.rectangle([40, 180, 440, 280], fill=WHITE, outline=BLACK, width=2)
+    draw.text((80, 210), state["love_note"], fill=BLACK, font=FONT_MEDIUM)
+
+def draw_heart(draw, pulse):
+    """Draw a large pulsing heart"""
+    size = int(100 + pulse * 20)
+    cx, cy = 240, 180
+    # Simple heart shape using polygons and circles
+    draw.ellipse([cx-size, cy-size, cx, cy], fill=(255, 100, 150))
+    draw.ellipse([cx, cy-size, cx+size, cy], fill=(255, 100, 150))
+    draw.polygon([(cx-size, cy-size//4), (cx+size, cy-size//4), (cx, cy+size)], fill=(255, 100, 150))
+    # Heart text
+    draw.text((185, 160), "I LOVE", fill=WHITE, font=FONT_SMALL)
+    draw.text((195, 190), "YOU!", fill=WHITE, font=FONT_MEDIUM)
+
 
 def convert_to_rgb565(pil_img):
     im_array = np.array(pil_img).astype(np.uint16)
@@ -260,35 +304,53 @@ def main():
                 should_render = True
                 state["needs_redraw"] = False
             
+            # 6. Heart animation (pulses every frame)
+            if state["current_mode"] == "HEART":
+                should_render = True
+            
+            # 7. Manual redraw flag
+            if state["needs_redraw"]:
+                should_render = True
+                state["needs_redraw"] = False
+            
             # Only render if something changed
             if should_render:
                 # 1. Create Frame
                 img = Image.new('RGB', (WIDTH, HEIGHT), BMO_COLOR)
                 draw = ImageDraw.Draw(img)
                 
-                # DIAGNOSTIC MODE RENDERING
-                if state["current_mode"] == "DIAGNOSTIC":
-                    draw.text((20, 20), "BMO TOUCH DIAGNOSTIC", fill=BLACK, font=FONT_MEDIUM)
-                    rx, ry = state["raw_coords"]
-                    draw.text((20, 60), f"RAW: X={rx}, Y={ry}", fill=BLACK, font=FONT_SMALL)
-                    
-                    if state["touch_pos"]:
-                        tx, ty = state["touch_pos"]
-                        draw.text((20, 90), f"CALIB: X={int(tx)}, Y={int(ty)}", fill=BLACK, font=FONT_SMALL)
-                        # Draw Crosshair
-                        draw.line([(tx-20, ty), (tx+20, ty)], fill=BLACK, width=2)
-                        draw.line([(tx, ty-20), (tx, ty+20)], fill=BLACK, width=2)
-                        draw.ellipse([tx-5, ty-5, tx+5, ty+5], outline=WHITE, width=1)
-                
-                # Other modes disabled for now
-                elif state["current_mode"] == "FACE":
+                # 2. Render content based on mode
+                if state["current_mode"] == "FACE":
                     draw_face(draw, state["expression"])
                 elif state["current_mode"] == "MENU":
-                    draw.rectangle([50, 50, 430, 270], fill=(60, 80, 75), outline=WHITE, width=2)
-                    draw.text((80, 105), "> 1. BACK TO FACE", fill=WHITE, font=FONT_SMALL)
-                    draw.text((80, 145), "> 2. SYSTEM STATS", fill=WHITE, font=FONT_SMALL)
-                    draw.text((80, 185), "> 3. MESSAGE CENTER", fill=WHITE, font=FONT_SMALL)
-                    draw.text((80, 225), "> 4. BMO CLOCK", fill=WHITE, font=FONT_SMALL)
+                    draw.rectangle([50, 40, 430, 300], fill=(60, 80, 75), outline=WHITE, width=2)
+                    draw.text((80, 50), "BMO MENU", fill=WHITE, font=FONT_SMALL)
+                    item_h = 35
+                    y = 80
+                    draw.text((80, y), "> 1. FACE", fill=WHITE, font=FONT_SMALL)
+                    draw.text((80, y + item_h), "> 2. HEALTH STATS", fill=WHITE, font=FONT_SMALL)
+                    draw.text((80, y + 2*item_h), "> 3. BIRTHDAY NOTE", fill=WHITE, font=FONT_SMALL)
+                    draw.text((80, y + 3*item_h), "> 4. CLOCK", fill=WHITE, font=FONT_SMALL)
+                    draw.text((80, y + 4*item_h), "> 5. LOVE NOTES", fill=WHITE, font=FONT_SMALL)
+                    draw.text((80, y + 5*item_h), "> 6. HEARTBEAT", fill=WHITE, font=FONT_SMALL)
+                elif state["current_mode"] == "STATS":
+                    draw_stats(draw)
+                elif state["current_mode"] == "MESSAGE":
+                    draw_message(draw)
+                elif state["current_mode"] == "CLOCK":
+                    draw_clock(draw)
+                elif state["current_mode"] == "NOTES":
+                    draw_notes(draw)
+                elif state["current_mode"] == "HEART":
+                    # Beating heart effect
+                    pulse = abs(np.sin(now * 4))
+                    draw_heart(draw, pulse)
+                
+                # 3. Menu Button (Global)
+                if state["current_mode"] != "MENU":
+                    draw.rectangle([380, 10, 470, 70], outline=BLACK, width=2)
+                    draw.text((395, 30), "MENU", fill=BLACK, font=FONT_SMALL)
+
 
 
                 # 3. Animation Overlay
