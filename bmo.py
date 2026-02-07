@@ -75,8 +75,10 @@ state = {
     "last_stats_update": 0,
     "last_time_update": "",
     "raw_coords": (0, 0),
-    "love_note": "You are amazing!", # Initial love note
+    "love_note": "You are amazing!",
+    "debug_info": "", # New field for performance logs
 }
+
 
 LOVE_NOTES = [
     "You are amazing!",
@@ -305,7 +307,11 @@ def main():
             
             # 6. Heart animation (pulses every frame)
             if state["current_mode"] == "HEART":
-                should_render = True
+                # Cap animation to ~20 FPS to avoid SPI saturation
+                if now - state["touch_time"] > 0.05: 
+                    should_render = True
+                    state["touch_time"] = now # Reuse touch_time as a frame timer
+
             
             # 7. Manual redraw flag
             if state["needs_redraw"]:
@@ -342,21 +348,20 @@ def main():
                     draw_clock(draw)
                 elif state["current_mode"] == "NOTES":
                     draw_notes(draw)
-                elif state["current_mode"] == "HEART":
+                if state["current_mode"] == "HEART":
                     # Beating heart effect
                     pulse = abs(np.sin(now * 4))
                     draw_heart(draw, pulse)
+                    # HUD Diagnostic (Simple)
+                    draw.text((10, 290), state["debug_info"], fill=WHITE, font=FONT_SMALL)
                 
                 # 3. Menu Button (Global Floating Design)
                 if state["current_mode"] != "MENU":
                     draw.rounded_rectangle([390, 15, 465, 65], radius=15, outline=BLACK, width=2, fill=(255, 255, 255, 150))
                     draw.text((405, 30), "•••", fill=BLACK, font=FONT_SMALL)
 
-
-
-
                 # 3. Animation Overlay
-                if state["touch_pos"]:
+                if state["touch_pos"] and state["current_mode"] != "HEART":
                     elapsed = now - state["touch_time"]
                     if elapsed < 0.4:
                         tx, ty = state["touch_pos"]
@@ -366,10 +371,14 @@ def main():
                 # 4. Write to framebuffer ONLY IF data changed
                 new_data = convert_to_rgb565(img)
                 if new_data != state["last_rendered_data"]:
+                    write_start = time.time()
                     fb.write(new_data)
                     fb.seek(0)
                     fb.flush()
+                    write_time = (time.time() - write_start) * 1000
+                    state["debug_info"] = f"SPI Write: {write_time:.1f}ms"
                     state["last_rendered_data"] = new_data
+
 
             
             # Sleep longer when idle to reduce CPU and prevent any flicker
