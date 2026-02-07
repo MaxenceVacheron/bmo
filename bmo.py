@@ -61,7 +61,7 @@ def get_ram_usage():
 
 # --- SYSTEM STATE ---
 state = {
-    "current_mode": "FACE", 
+    "current_mode": "DIAGNOSTIC", # Mode for debugging
     "expression": "happy",
     "touch_pos": None,
     "touch_time": 0,
@@ -69,7 +69,8 @@ state = {
     "needs_redraw": True,
     "last_mode": None,
     "last_stats_update": 0,
-    "last_time_update": "", # Track time change
+    "last_time_update": "",
+    "raw_coords": (0, 0), # Track raw values for diagnosis
 }
 
 # --- TOUCH LOGIC (Y-INVERSION FIXED) ---
@@ -80,46 +81,27 @@ def touch_thread():
         raw_x, raw_y = 0, 0
         finger_down = False
         for event in dev.read_loop():
-            # Coordinate tracking
             if event.type == ecodes.EV_ABS:
                 if event.code == ecodes.ABS_X: raw_x = event.value
                 if event.code == ecodes.ABS_Y: raw_y = event.value
             
-            # Touch tracking
             if event.type == ecodes.EV_KEY and event.code == ecodes.BTN_TOUCH:
                 finger_down = (event.value == 1)
             
-            # SYN_REPORT means the packet (coordinations + touch state) is complete
             if event.type == ecodes.EV_SYN and event.code == ecodes.SYN_REPORT:
+                state["raw_coords"] = (raw_x, raw_y)
                 if finger_down:
-                    # CALCULATE with the synchronized coordinates
                     sx = WIDTH - ((raw_y / 4095) * WIDTH)
                     sy = (raw_x / 4095) * HEIGHT 
                     
-                    # If this is the start of a touch (pos was None)
-                    if state["touch_pos"] is None:
-                        state["touch_pos"] = (sx, sy)
-                        state["touch_time"] = time.time()
-                        state["needs_redraw"] = True
-                        
-                        # HITBOXES
-                        if sx > 380 and sy < 80:
-                            new_mode = "MENU" if state["current_mode"] != "MENU" else "FACE"
-                            state["current_mode"] = new_mode
-                            state["needs_redraw"] = True
-                        
-                        elif state["current_mode"] == "MENU":
-                            new_mode = None
-                            if 100 < sy < 140: new_mode = "FACE"
-                            elif 140 < sy < 180: new_mode = "STATS"
-                            elif 180 < sy < 220: new_mode = "MESSAGE"
-                            elif 220 < sy < 260: new_mode = "CLOCK"
-                            
-                            if new_mode:
-                                state["current_mode"] = new_mode
-                                state["needs_redraw"] = True
+                    # Update position every time for visual tracking
+                    state["touch_pos"] = (sx, sy)
+                    state["touch_time"] = time.time()
+                    state["needs_redraw"] = True
+                    
+                    # HITBOXES DISABLED FOR DIAGNOSIS
                 else:
-                    # Finger released
+                    # Keep touch_pos for a moment after release to see it
                     pass
 
     except Exception as e: print(f"Touch Error: {e}")
@@ -284,8 +266,22 @@ def main():
                 img = Image.new('RGB', (WIDTH, HEIGHT), BMO_COLOR)
                 draw = ImageDraw.Draw(img)
                 
-                # 2. Render content based on mode
-                if state["current_mode"] == "FACE":
+                # DIAGNOSTIC MODE RENDERING
+                if state["current_mode"] == "DIAGNOSTIC":
+                    draw.text((20, 20), "BMO TOUCH DIAGNOSTIC", fill=BLACK, font=FONT_MEDIUM)
+                    rx, ry = state["raw_coords"]
+                    draw.text((20, 60), f"RAW: X={rx}, Y={ry}", fill=BLACK, font=FONT_SMALL)
+                    
+                    if state["touch_pos"]:
+                        tx, ty = state["touch_pos"]
+                        draw.text((20, 90), f"CALIB: X={int(tx)}, Y={int(ty)}", fill=BLACK, font=FONT_SMALL)
+                        # Draw Crosshair
+                        draw.line([(tx-20, ty), (tx+20, ty)], fill=BLACK, width=2)
+                        draw.line([(tx, ty-20), (tx, ty+20)], fill=BLACK, width=2)
+                        draw.ellipse([tx-5, ty-5, tx+5, ty+5], outline=WHITE, width=1)
+                
+                # Other modes disabled for now
+                elif state["current_mode"] == "FACE":
                     draw_face(draw, state["expression"])
                 elif state["current_mode"] == "MENU":
                     draw.rectangle([50, 50, 430, 270], fill=(60, 80, 75), outline=WHITE, width=2)
@@ -293,17 +289,7 @@ def main():
                     draw.text((80, 145), "> 2. SYSTEM STATS", fill=WHITE, font=FONT_SMALL)
                     draw.text((80, 185), "> 3. MESSAGE CENTER", fill=WHITE, font=FONT_SMALL)
                     draw.text((80, 225), "> 4. BMO CLOCK", fill=WHITE, font=FONT_SMALL)
-                elif state["current_mode"] == "STATS":
-                    draw_stats(draw)
-                elif state["current_mode"] == "MESSAGE":
-                    draw_message(draw)
-                elif state["current_mode"] == "CLOCK":
-                    draw_clock(draw)
-                
-                # Menu button indicator for all non-menu modes
-                if state["current_mode"] != "MENU":
-                    draw.rectangle([380, 10, 470, 70], outline=BLACK, width=2)
-                    draw.text((395, 30), "MENU", fill=BLACK, font=FONT_SMALL)
+
 
                 # 3. Animation Overlay
                 if state["touch_pos"]:
