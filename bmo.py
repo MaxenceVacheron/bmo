@@ -161,82 +161,58 @@ def draw_face(draw, expr):
         draw.line([(220, 210), (260, 210)], fill=BLACK, width=3)
 
 def draw_stats(draw):
-    """Modern Dashboard style stats"""
-    draw.text((60, 40), "SYSTEM VITALS", fill=BLACK, font=FONT_MEDIUM)
+    """Retro Pixel Dashboard"""
+    draw.text((20, 10), "SYSTEM HEALTH", fill=BLACK, font=FONT_MEDIUM)
     
-    # CPU Gauge
+    # CPU Gauge (Chunkier)
     temp = get_cpu_temp()
-    draw.text((60, 90), "CORE TEMP", fill=ACCENT_COLOR, font=FONT_SMALL)
-    # Background pill
-    draw.rounded_rectangle([60, 115, 420, 135], radius=10, fill=(255, 255, 255, 100), outline=BLACK, width=1)
-    # Fill pill
-    w = int(360 * min(temp/80, 1))
-    color = (80, 200, 120) if temp < 55 else (255, 150, 50)
-    if w > 4: draw.rounded_rectangle([62, 117, 60+w, 133], radius=8, fill=color)
-    draw.text((360, 90), f"{temp:.1f}°C", fill=BLACK, font=FONT_SMALL)
+    draw.text((20, 45), "CORE TEMP", fill=BLACK, font=FONT_SMALL)
+    draw.rectangle([20, 65, 220, 85], outline=BLACK, width=2)
+    w = int(196 * min(temp/80, 1))
+    color = (50, 200, 50) if temp < 55 else (255, 50, 50)
+    if w > 0: draw.rectangle([22, 67, 20+w, 83], fill=color)
+    draw.text((180, 45), f"{int(temp)}C", fill=BLACK, font=FONT_SMALL)
 
     # RAM Gauge
     ram = get_ram_usage()
-    draw.text((60, 170), "MEMORY LOAD", fill=ACCENT_COLOR, font=FONT_SMALL)
-    draw.rounded_rectangle([60, 195, 420, 215], radius=10, fill=(255, 255, 255, 100), outline=BLACK, width=1)
-    w = int(360 * (ram/100))
-    if w > 4: draw.rounded_rectangle([62, 197, 60+w, 213], radius=8, fill=(100, 150, 255))
-    draw.text((360, 170), f"{ram:.1f}%", fill=BLACK, font=FONT_SMALL)
-
+    draw.text((20, 100), "ENERGY", fill=BLACK, font=FONT_SMALL)
+    draw.rectangle([20, 120, 220, 140], outline=BLACK, width=2)
+    w = int(196 * (ram/100))
+    if w > 0: draw.rectangle([22, 122, 20+w, 138], fill=(50, 100, 255))
+    draw.text((180, 100), f"{int(ram)}%", fill=BLACK, font=FONT_SMALL)
 
 def draw_message(draw):
-    """Draw personalized message center"""
-    # Background accent
-    draw.rectangle([30, 30, 450, 290], outline=WHITE, width=3)
-    draw.rectangle([40, 40, 440, 280], outline=BLACK, width=2)
-    
-    # Main message - large text
-    draw.text((90, 100), "Happy Birthday!", fill=BLACK, font=FONT_LARGE)
-    
-    # Decorative hearts
-    for x, y in [(60, 60), (400, 60), (60, 250), (400, 250)]:
-        draw.polygon([
-            (x, y + 8), (x - 8, y), (x - 4, y - 4),
-            (x, y - 2), (x + 4, y - 4), (x + 8, y)
-        ], fill=(255, 100, 150))
+    """Old School Message"""
+    draw.rectangle([10, 10, 230, 150], outline=BLACK, width=3)
+    draw.text((30, 40), "HAPPY", fill=BLACK, font=FONT_LARGE)
+    draw.text((30, 90), "BIRTHDAY!", fill=BLACK, font=FONT_LARGE)
     
     # Personal note area
     draw.text((120, 180), "From your friend,", fill=BLACK, font=FONT_SMALL)
     draw.text((140, 210), "with love ♥", fill=(200, 50, 100), font=FONT_MEDIUM)
 
 def draw_clock(draw):
-    """Minimal Modern Clock"""
+    """Retro Digital Clock"""
     current_time = time.strftime("%H:%M")
-    # Centered High-impact time
-    draw.text((120, 110), current_time, fill=BLACK, font=FONT_LARGE)
-    draw.text((125, 160), time.strftime("%A, %b %d"), fill=ACCENT_COLOR, font=FONT_SMALL)
+    draw.text((45, 50), current_time, fill=BLACK, font=FONT_LARGE)
+    draw.text((45, 100), time.strftime("%A"), fill=BLACK, font=FONT_SMALL)
 
 def draw_notes(draw):
-    """Premium Card Note"""
-    draw_face(draw, "happy")
-    # Floating Glass Card
-    draw.rounded_rectangle([40, 180, 440, 280], radius=20, fill=(255, 255, 255, 180), outline=BLACK, width=2)
-    draw.text((70, 215), state["love_note"], fill=BLACK, font=FONT_MEDIUM)
+    """Retro Note Card"""
+    draw.rectangle([20, 20, 220, 140], fill=WHITE, outline=BLACK, width=3)
+    # Wrap text manually or use a simple line
+    draw.text((35, 60), state["love_note"], fill=BLACK, font=FONT_SMALL)
 
 def draw_heart(draw, pulse):
-    """Artistic Pulsing Heart with Glow"""
-    cx, cy = 240, 160
-    # Use a more organic pulse rhythm (double beat)
-    base_size = int(80 + pulse * 25)
-    
-    # Draw Inner Glow (only at peak pulse)
-    if pulse > 0.6:
-        for i in range(2):
-            gs = base_size + (i * 15)
-            draw.ellipse([cx-gs, cy-gs, cx+gs, cy+gs], outline=(255, 180, 200, 40), width=2)
+    """Big Blocky Pixel Heart"""
+    cx, cy = 120, 80
+    size = int(40 + pulse * 15)
+    # Drawing heart with large rectangles for pixel feel
+    draw.rectangle([cx-size, cy-size, cx, cy], fill=PINK)
+    draw.rectangle([cx, cy-size, cx+size, cy], fill=PINK)
+    draw.polygon([(cx-size, cy), (cx+size, cy), (cx, cy+size)], fill=PINK)
+    draw.text((95, 70), "YOU!", fill=WHITE, font=FONT_SMALL)
 
-    # Simplified Vector Heart
-    draw.ellipse([cx-base_size, cy-base_size, cx, cy], fill=PINK)
-    draw.ellipse([cx, cy-base_size, cx+base_size, cy], fill=PINK)
-    draw.polygon([(cx-base_size, cy-base_size//2), (cx+base_size, cy-base_size//2), (cx, cy+base_size)], fill=PINK)
-    
-    # Minimalist text
-    draw.text((195, 145), "MINE", fill=WHITE, font=FONT_MEDIUM)
 
 
 
@@ -325,26 +301,22 @@ def main():
             
             # Only render if something changed
             if should_render:
-                # 1. Create Frame
-                img = Image.new('RGB', (WIDTH, HEIGHT), BMO_COLOR)
+                # 1. Choose Resolution
+                is_face = (state["current_mode"] == "FACE")
+                res = (WIDTH, HEIGHT) if is_face else (WIDTH//2, HEIGHT//2)
+                
+                img = Image.new('RGB', res, BMO_COLOR)
                 draw = ImageDraw.Draw(img)
                 
-                # 2. Render content based on mode
+                # 2. Render content
                 if state["current_mode"] == "FACE":
                     draw_face(draw, state["expression"])
                 elif state["current_mode"] == "MENU":
-                    # Glassmorphism Card
-                    draw.rounded_rectangle([40, 30, 440, 300], radius=25, fill=(255, 255, 255, 220), outline=BLACK, width=2)
-                    draw.text((170, 45), "BMO DASH", fill=ACCENT_COLOR, font=FONT_SMALL)
-                    
-                    item_h = 40
-                    y_start = 85
-                    options = ["DASHBOARD", "HEALTH", "BIRTHDAY", "CLOCK", "NOTES", "HEART"]
+                    draw.rectangle([10, 10, 230, 150], fill=WHITE, outline=BLACK, width=2)
+                    draw.text((30, 20), "BMO SELECT", fill=BLACK, font=FONT_SMALL)
+                    options = ["FACE", "STATS", "WISH", "TIME", "NOTE", "HEART"]
                     for i, opt in enumerate(options):
-                        # Selector dot
-                        draw.ellipse([70, y_start + i*item_h + 10, 80, y_start + i*item_h + 20], fill=ACCENT_COLOR)
-                        draw.text((100, y_start + i*item_h), opt, fill=BLACK, font=FONT_SMALL)
-
+                        draw.text((40, 45 + i*18), f"{i+1}. {opt}", fill=BLACK, font=FONT_SMALL)
                 elif state["current_mode"] == "STATS":
                     draw_stats(draw)
                 elif state["current_mode"] == "MESSAGE":
@@ -353,33 +325,32 @@ def main():
                     draw_clock(draw)
                 elif state["current_mode"] == "NOTES":
                     draw_notes(draw)
-                if state["current_mode"] == "HEART":
-                    # Beating heart effect (Organic double-thump Lub-Dub)
-                    t = now * 1.5 # Speed adjustment
+                elif state["current_mode"] == "HEART":
+                    t = now * 1.5
                     pulse = (abs(np.sin(t * np.pi)) ** 30) * 0.5 + (abs(np.sin(t * np.pi - 1.5)) ** 30) * 1.0
                     draw_heart(draw, min(pulse, 1.2))
-
                 
-                # 3. Menu Button (Global Floating Design)
+                # Global Menu Button (Blocky)
                 if state["current_mode"] != "MENU":
-                    draw.rounded_rectangle([390, 15, 465, 65], radius=15, outline=BLACK, width=2, fill=(255, 255, 255, 150))
-                    draw.text((405, 30), "•••", fill=BLACK, font=FONT_SMALL)
+                    if is_face:
+                        draw.rectangle([380, 15, 465, 65], outline=BLACK, width=4, fill=WHITE)
+                        draw.text((405, 30), "MT", fill=BLACK, font=FONT_SMALL)
+                    else:
+                        draw.rectangle([190, 10, 230, 30], outline=BLACK, width=2, fill=WHITE)
+                        draw.text((200, 12), "M", fill=BLACK, font=FONT_SMALL)
 
-                # 3. Animation Overlay
-                if state["touch_pos"] and state["current_mode"] != "HEART":
-                    elapsed = now - state["touch_time"]
-                    if elapsed < 0.4:
-                        tx, ty = state["touch_pos"]
-                        rad = int(elapsed * 80)
-                        draw.ellipse([tx-rad, ty-rad, tx+rad, ty+rad], outline=WHITE, width=2)
+                # 3. Upscale if needed
+                if not is_face:
+                    img = img.resize((WIDTH, HEIGHT), Image.NEAREST)
 
-                # 4. Write to framebuffer ONLY IF data changed
+                # 4. Filter and Write
                 new_data = convert_to_rgb565(img)
                 if new_data != state["last_rendered_data"]:
                     fb.write(new_data)
                     fb.seek(0)
                     fb.flush()
                     state["last_rendered_data"] = new_data
+
 
 
 
