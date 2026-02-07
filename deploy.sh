@@ -9,6 +9,7 @@ echo "🤖 Deploying BMO code to device..."
 ssh bmo << 'EOF'
 cd /home/pi/bmo
 echo "📥 Resetting to latest code..."
+git fetch
 git reset --hard origin/main
 echo "🚀 Starting BMO..."
 sudo python3 /home/pi/bmo/bmo.py
