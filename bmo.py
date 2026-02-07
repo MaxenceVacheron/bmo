@@ -2,13 +2,13 @@ import os, time, socket, random, threading
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-# --- FONT SETUP ---
+# --- FONTS (Native 480x320 sizing) ---
 try:
-    FONT_LARGE = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 32)
-    FONT_MEDIUM = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 20)
-    FONT_SMALL = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
+    FONT_LARGE = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 70)
+    FONT_MEDIUM = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 40)
+    FONT_SMALL = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 25)
 except:
-    FONT_LARGE = FONT_MEDIUM = FONT_SMALL = None  # Fallback to default
+    FONT_LARGE = FONT_MEDIUM = FONT_SMALL = ImageFont.load_default() # Fallback to default
 
 
 # --- CONFIG ---
@@ -161,57 +161,50 @@ def draw_face(draw, expr):
         draw.line([(220, 210), (260, 210)], fill=BLACK, width=3)
 
 def draw_stats(draw):
-    """Retro Pixel Dashboard"""
-    draw.text((20, 10), "SYSTEM HEALTH", fill=BLACK, font=FONT_MEDIUM)
+    """Neo-Retro High Contrast Stats"""
+    draw.text((40, 30), "SYSTEM STATUS", fill=BLACK, font=FONT_MEDIUM)
     
-    # CPU Gauge (Chunkier)
+    # CPU Gauge (HEAVY)
     temp = get_cpu_temp()
-    draw.text((20, 45), "CORE TEMP", fill=BLACK, font=FONT_SMALL)
-    draw.rectangle([20, 65, 220, 85], outline=BLACK, width=2)
-    w = int(196 * min(temp/80, 1))
-    color = (50, 200, 50) if temp < 55 else (255, 50, 50)
-    if w > 0: draw.rectangle([22, 67, 20+w, 83], fill=color)
-    draw.text((180, 45), f"{int(temp)}C", fill=BLACK, font=FONT_SMALL)
+    draw.text((40, 90), f"TEMP: {int(temp)}C", fill=BLACK, font=FONT_SMALL)
+    draw.rectangle([40, 125, 440, 165], outline=BLACK, width=6)
+    w = int(390 * min(temp/80, 1))
+    color = (50, 220, 100) if temp < 55 else (255, 80, 80)
+    if w > 0: draw.rectangle([45, 130, 40+w, 160], fill=color)
 
-    # RAM Gauge
+    # RAM Gauge (HEAVY)
     ram = get_ram_usage()
-    draw.text((20, 100), "ENERGY", fill=BLACK, font=FONT_SMALL)
-    draw.rectangle([20, 120, 220, 140], outline=BLACK, width=2)
-    w = int(196 * (ram/100))
-    if w > 0: draw.rectangle([22, 122, 20+w, 138], fill=(50, 100, 255))
-    draw.text((180, 100), f"{int(ram)}%", fill=BLACK, font=FONT_SMALL)
-
-def draw_message(draw):
-    """Old School Message"""
-    draw.rectangle([10, 10, 230, 150], outline=BLACK, width=3)
-    draw.text((30, 40), "HAPPY", fill=BLACK, font=FONT_LARGE)
-    draw.text((30, 90), "BIRTHDAY!", fill=BLACK, font=FONT_LARGE)
+    draw.text((40, 190), f"ENERGY: {int(ram)}%", fill=BLACK, font=FONT_SMALL)
+    draw.rectangle([40, 225, 440, 265], outline=BLACK, width=6)
+    w = int(390 * (ram/100))
+    if w > 0: draw.rectangle([45, 230, 40+w, 260], fill=(100, 180, 255))
     
     # Personal note area
     draw.text((120, 180), "From your friend,", fill=BLACK, font=FONT_SMALL)
     draw.text((140, 210), "with love ♥", fill=(200, 50, 100), font=FONT_MEDIUM)
 
 def draw_clock(draw):
-    """Retro Digital Clock"""
+    """Bold Modern Clock"""
     current_time = time.strftime("%H:%M")
-    draw.text((45, 50), current_time, fill=BLACK, font=FONT_LARGE)
-    draw.text((45, 100), time.strftime("%A"), fill=BLACK, font=FONT_SMALL)
+    draw.text((80, 100), current_time, fill=BLACK, font=FONT_LARGE)
+    draw.text((80, 180), time.strftime("%A").upper(), fill=BLACK, font=FONT_MEDIUM)
 
 def draw_notes(draw):
-    """Retro Note Card"""
-    draw.rectangle([20, 20, 220, 140], fill=WHITE, outline=BLACK, width=3)
-    # Wrap text manually or use a simple line
-    draw.text((35, 60), state["love_note"], fill=BLACK, font=FONT_SMALL)
+    """Heavy Border Note"""
+    draw_face(draw, "happy")
+    draw.rectangle([30, 180, 450, 300], fill=WHITE, outline=BLACK, width=6)
+    draw.text((60, 220), state["love_note"], fill=BLACK, font=FONT_SMALL)
 
 def draw_heart(draw, pulse):
-    """Big Blocky Pixel Heart"""
-    cx, cy = 120, 80
-    size = int(40 + pulse * 15)
-    # Drawing heart with large rectangles for pixel feel
-    draw.rectangle([cx-size, cy-size, cx, cy], fill=PINK)
-    draw.rectangle([cx, cy-size, cx+size, cy], fill=PINK)
-    draw.polygon([(cx-size, cy), (cx+size, cy), (cx, cy+size)], fill=PINK)
-    draw.text((95, 70), "YOU!", fill=WHITE, font=FONT_SMALL)
+    """Massive Stylized Heart"""
+    cx, cy = 240, 160
+    size = int(100 + pulse * 30)
+    # Drawing heart with thick outlines
+    draw.ellipse([cx-size, cy-size, cx, cy], fill=PINK, outline=BLACK, width=4)
+    draw.ellipse([cx, cy-size, cx+size, cy], fill=PINK, outline=BLACK, width=4)
+    draw.polygon([(cx-size, cy-size//4), (cx+size, cy-size//4), (cx, cy+size)], fill=PINK, outline=BLACK, width=4)
+    draw.text((180, 135), "MINE", fill=WHITE, font=FONT_MEDIUM)
+
 
 
 
@@ -301,26 +294,26 @@ def main():
             
             # Only render if something changed
             if should_render:
-                # 1. Choose Resolution
-                is_face = (state["current_mode"] == "FACE")
-                res = (WIDTH, HEIGHT) if is_face else (WIDTH//2, HEIGHT//2)
-                
-                img = Image.new('RGB', res, BMO_COLOR)
+                # 1. Back to Native Resolution (480x320)
+                img = Image.new('RGB', (WIDTH, HEIGHT), BMO_COLOR)
                 draw = ImageDraw.Draw(img)
                 
                 # 2. Render content
                 if state["current_mode"] == "FACE":
                     draw_face(draw, state["expression"])
                 elif state["current_mode"] == "MENU":
-                    draw.rectangle([10, 10, 230, 150], fill=WHITE, outline=BLACK, width=2)
-                    draw.text((30, 20), "BMO SELECT", fill=BLACK, font=FONT_SMALL)
-                    options = ["FACE", "STATS", "WISH", "TIME", "NOTE", "HEART"]
+                    draw.rectangle([40, 20, 440, 300], fill=WHITE, outline=BLACK, width=6)
+                    draw.text((70, 40), "SELECT MODE", fill=BLACK, font=FONT_MEDIUM)
+                    options = ["1. FACE", "2. STATS", "3. WISH", "4. CLOCK", "5. NOTES", "6. HEART"]
                     for i, opt in enumerate(options):
-                        draw.text((40, 45 + i*18), f"{i+1}. {opt}", fill=BLACK, font=FONT_SMALL)
+                        draw.text((80, 100 + i*32), opt, fill=BLACK, font=FONT_SMALL)
                 elif state["current_mode"] == "STATS":
                     draw_stats(draw)
                 elif state["current_mode"] == "MESSAGE":
-                    draw_message(draw)
+                    # Draw custom message here
+                    draw.rectangle([30, 30, 450, 290], outline=BLACK, width=8)
+                    draw.text((70, 80), "HAPPY", fill=BLACK, font=FONT_LARGE)
+                    draw.text((70, 160), "BIRTHDAY!", fill=BLACK, font=FONT_LARGE)
                 elif state["current_mode"] == "CLOCK":
                     draw_clock(draw)
                 elif state["current_mode"] == "NOTES":
@@ -330,26 +323,19 @@ def main():
                     pulse = (abs(np.sin(t * np.pi)) ** 30) * 0.5 + (abs(np.sin(t * np.pi - 1.5)) ** 30) * 1.0
                     draw_heart(draw, min(pulse, 1.2))
                 
-                # Global Menu Button (Blocky)
+                # Global Menu Button (Arcade Style)
                 if state["current_mode"] != "MENU":
-                    if is_face:
-                        draw.rectangle([380, 15, 465, 65], outline=BLACK, width=4, fill=WHITE)
-                        draw.text((405, 30), "MT", fill=BLACK, font=FONT_SMALL)
-                    else:
-                        draw.rectangle([190, 10, 230, 30], outline=BLACK, width=2, fill=WHITE)
-                        draw.text((200, 12), "M", fill=BLACK, font=FONT_SMALL)
+                    draw.ellipse([400, 20, 460, 80], fill=WHITE, outline=BLACK, width=4)
+                    draw.text((418, 38), "M", fill=BLACK, font=FONT_SMALL)
 
-                # 3. Upscale if needed
-                if not is_face:
-                    img = img.resize((WIDTH, HEIGHT), Image.NEAREST)
-
-                # 4. Filter and Write
+                # 3. Filter and Write
                 new_data = convert_to_rgb565(img)
                 if new_data != state["last_rendered_data"]:
                     fb.write(new_data)
                     fb.seek(0)
                     fb.flush()
                     state["last_rendered_data"] = new_data
+
 
 
 
