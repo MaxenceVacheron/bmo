@@ -207,9 +207,38 @@ def main():
     
     clock = pygame.time.Clock()
     
+import math
+
+# ... (rest of imports)
+
+# ... inside main() ...
+
     # Open FB0 for raw write
     fb_fd = os.open(FB_DEVICE, os.O_RDWR)
     
+    # --- STARTUP ANIMATION ---
+    start_time = time.time()
+    while time.time() - start_time < 2.0:
+        screen.fill(TEAL)
+        # Draw face manually to overlay text
+        pygame.draw.circle(screen, BLACK, (140, 120), 15)
+        pygame.draw.circle(screen, BLACK, (340, 120), 15)
+        pygame.draw.arc(screen, BLACK, (200, 180, 80, 40), 3.14, 6.28, 5)
+        pygame.draw.circle(screen, PINK, (110, 150), 15)
+        pygame.draw.circle(screen, PINK, (370, 150), 15)
+        
+        # Bouncing Text
+        t = (time.time() - start_time) * 8
+        offset = int(math.sin(t) * 10)
+        lbl = FONT_LARGE.render("HELLO!", False, BLACK)
+        screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, 40 + offset))
+        
+        try:
+            os.lseek(fb_fd, 0, os.SEEK_SET)
+            os.write(fb_fd, screen.get_buffer())
+        except: pass
+        clock.tick(30)
+
     running = True
     while running:
         # Event Loop
