@@ -112,11 +112,15 @@ def draw_face(screen):
     pygame.draw.circle(screen, BLACK, (140, 120), 15)
     pygame.draw.circle(screen, BLACK, (340, 120), 15)
     
+    # Mouth (Simple Round Smile)
     if state["expression"] == "happy":
-        pygame.draw.lines(screen, BLACK, False, [(200, 180), (200, 195), (280, 195), (280, 180)], 5)
+        # Arc: Rect(x, y, w, h), StartAngle, StopAngle, Width
+        # Angle 3.14 (Pi) to 0 (2Pi) is the bottom half in Pygame's inverted Y-axis logic? 
+        # Actually in Pygame arc: 0 is right, 3.14 is left. Clockwise?
+        # Let's try standard bottom arc: Pi (Left) to 2*Pi (Right) or 0.
+        pygame.draw.arc(screen, BLACK, (190, 170, 100, 50), 3.14, 6.28, 4)
     
-    pygame.draw.circle(screen, PINK, (110, 150), 15)
-    pygame.draw.circle(screen, PINK, (370, 150), 15)
+    # Cheeks Removed (As requested for show usage)
 
 def draw_menu(screen):
     screen.fill(WHITE)
