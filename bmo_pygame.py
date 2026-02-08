@@ -17,8 +17,7 @@ FB_DEVICE = "/dev/fb1"
 TOUCH_DEVICE = "/dev/input/event4" # SPI-connected touch panel on CS1
 NEXTCLOUD_PATH = "/home/pi/mnt/nextcloud/shr/BMO_Agnes"
 CONFIG_FILE = "/home/pi/bmo/bmo_config.json"
-FACE_OPEN_DIR = "/home/pi/bmo/bmo_faces/open"
-FACE_CLOSED_DIR = "/home/pi/bmo/bmo_faces/closed"
+BMO_FACES_ROOT = "/home/pi/bmo/bmo_faces"
 
 def load_config():
     """Load configuration from file"""
@@ -176,6 +175,7 @@ state = {
     "pop_face_timer": time.time() + 60,
     "is_showing_pop_face": False,
     "pop_face_end_time": 0,
+    "emotion": "positive", # Default emotion
     "face_images": [],
     "current_face_open": None,
     "current_face_closed": None,
@@ -592,23 +592,30 @@ def draw_startup(screen):
 
 # --- FACE IMAGE MANAGEMENT ---
 def load_random_face():
-    """Load a random face pair (open/closed) from the bmo_faces directories"""
-    if not state["face_images"]:
-        if os.path.exists(FACE_OPEN_DIR):
-            state["face_images"] = [f for f in os.listdir(FACE_OPEN_DIR) 
-                                   if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+    """Load a random face pair (open/closed) from the current emotion directory"""
+    emotion = state.get("emotion", "positive")
+    open_dir = os.path.join(BMO_FACES_ROOT, emotion, "open")
+    closed_dir = os.path.join(BMO_FACES_ROOT, emotion, "closed")
+    
+    # Always refresh list when switching emotions or if empty
+    state["face_images"] = []
+    if os.path.exists(open_dir):
+        state["face_images"] = [f for f in os.listdir(open_dir) 
+                               if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
     
     if state["face_images"]:
         try:
             filename = random.choice(state["face_images"])
-            open_path = os.path.join(FACE_OPEN_DIR, filename)
-            closed_path = os.path.join(FACE_CLOSED_DIR, filename)
+            open_path = os.path.join(open_dir, filename)
+            closed_path = os.path.join(closed_dir, filename)
             
             # Helper to load and format surface
             def _prep_surf(path):
                 if not os.path.exists(path): return None
                 img = Image.open(path).convert('RGB')
                 img = img.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
+            
+            # Convert to Pygame
                 data = img.tobytes()
                 pygame_img = pygame.image.fromstring(data, img.size, img.mode)
                 
@@ -623,9 +630,9 @@ def load_random_face():
             # Fallback if closed version doesn't exist
             if state["current_face_closed"] is None:
                 state["current_face_closed"] = state["current_face_open"]
-                print(f"Loaded face: {filename} (no closed version)")
+                print(f"Loaded {emotion} face: {filename} (no closed version)")
             else:
-                print(f"Loaded face: {filename} (with blink version)")
+                print(f"Loaded {emotion} face: {filename} (with blink version)")
                 
             state["last_face_switch"] = time.time()
             sys.stdout.flush()
