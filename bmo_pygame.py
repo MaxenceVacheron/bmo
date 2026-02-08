@@ -17,7 +17,8 @@ FB_DEVICE = "/dev/fb1"
 TOUCH_DEVICE = "/dev/input/event4" # SPI-connected touch panel on CS1
 NEXTCLOUD_PATH = "/home/pi/mnt/nextcloud/shr/BMO_Agnes"
 CONFIG_FILE = "/home/pi/bmo/bmo_config.json"
-FACE_DIR = "/home/pi/bmo/bmo_faces"
+FACE_OPEN_DIR = "/home/pi/bmo/bmo_faces/open"
+FACE_CLOSED_DIR = "/home/pi/bmo/bmo_faces/closed"
 
 def load_config():
     """Load configuration from file"""
@@ -176,7 +177,8 @@ state = {
     "is_showing_pop_face": False,
     "pop_face_end_time": 0,
     "face_images": [],
-    "current_face_surface": None,
+    "current_face_open": None,
+    "current_face_closed": None,
     "last_face_switch": 0,
     "startup": {
         "message": "Hello Agnès! I'm BMO. Maxence built my brain just for you.",
@@ -590,30 +592,39 @@ def draw_startup(screen):
 
 # --- FACE IMAGE MANAGEMENT ---
 def load_random_face():
-    """Load a random face from the bmo_faces directory"""
+    """Load a random face pair (open/closed) from the bmo_faces directories"""
     if not state["face_images"]:
-        if os.path.exists(FACE_DIR):
-            state["face_images"] = [os.path.join(FACE_DIR, f) for f in os.listdir(FACE_DIR) 
+        if os.path.exists(FACE_OPEN_DIR):
+            state["face_images"] = [f for f in os.listdir(FACE_OPEN_DIR) 
                                    if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
     
     if state["face_images"]:
         try:
-            face_path = random.choice(state["face_images"])
-            img = Image.open(face_path).convert('RGB')
-            img = img.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
+            filename = random.choice(state["face_images"])
+            open_path = os.path.join(FACE_OPEN_DIR, filename)
+            closed_path = os.path.join(FACE_CLOSED_DIR, filename)
             
-            # Convert to Pygame
-            data = img.tobytes()
-            pygame_img = pygame.image.fromstring(data, img.size, img.mode)
+            # Helper to load and format surface
+            def _prep_surf(path):
+                if not os.path.exists(path): return None
+                img = Image.open(path).convert('RGB')
+                img = img.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
+                data = img.tobytes()
+                pygame_img = pygame.image.fromstring(data, img.size, img.mode)
+                surf = pygame.Surface((WIDTH, HEIGHT), depth=16, masks=(0xF800, 0x07E0, 0x001F, 0))
+                surf.blit(pygame_img, (0, 0))
+                return surf
+
+            state["current_face_open"] = _prep_surf(open_path)
+            state["current_face_closed"] = _prep_surf(closed_path)
             
-            # Convert to screen format
-            converted = pygame.Surface((WIDTH, HEIGHT), depth=16, masks=(0xF800, 0x07E0, 0x001F, 0))
-            converted.blit(pygame_img, (0, 0))
-            
-            state["current_face_surface"] = converted
+            # Fallback if closed version doesn't exist
+            if state["current_face_closed"] is None:
+                state["current_face_closed"] = state["current_face_open"]
+                
             state["last_face_switch"] = time.time()
         except Exception as e:
-            print(f"Error loading face image: {e}")
+            print(f"Error loading face images: {e}")
 
 # --- FOCUS MODE FUNCTIONS ---
 def start_focus_timer(minutes):
@@ -704,19 +715,19 @@ def update_face():
             state["blink_end_time"] = now + 0.15 # Blink duration
 
 def draw_face(screen):
-    if state["current_face_surface"]:
-        screen.blit(state["current_face_surface"], (0, 0))
+    if state["is_blinking"]:
+        target_surf = state["current_face_closed"]
+    else:
+        target_surf = state["current_face_open"]
+
+    if target_surf:
+        screen.blit(target_surf, (0, 0))
     else:
         screen.fill(TEAL)
-        # Fallback if image failed
+        # Deep Fallback
         pygame.draw.circle(screen, BLACK, (140, 120), 9)
         pygame.draw.circle(screen, BLACK, (340, 120), 9)
         pygame.draw.arc(screen, BLACK, (210, 140, 60, 40), 3.14, 6.28, 4)
-    
-    if state["is_blinking"]:
-        # Digital blink overlay (works on any image)
-        pygame.draw.line(screen, BLACK, (130, 120), (150, 120), 6)
-        pygame.draw.line(screen, BLACK, (330, 120), (350, 120), 6)
 
 def draw_menu(screen):
     screen.fill(WHITE)
