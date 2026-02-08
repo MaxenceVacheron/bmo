@@ -135,6 +135,9 @@ state = {
     "blink_timer": 0, # Time until next blink
     "is_blinking": False,
     "blink_end_time": 0,
+    "middle_finger_timer": 0,
+    "show_middle_finger": False,
+    "middle_finger_end_time": 0,
     "startup": {
         "message": "Hello Agnès! I'm BMO. Maxence built my brain just for you.",
         "char_index": 0,
@@ -613,8 +616,10 @@ def draw_focus_face(screen):
 
 # --- COMMON DRAWING ---
 def update_face():
-    """Update BMO's face state (blinking)"""
+    """Update BMO's face state (blinking and occasional middle finger)"""
     now = time.time()
+    
+    # Blinking logic
     if state["is_blinking"]:
         if now > state["blink_end_time"]:
             state["is_blinking"] = False
@@ -623,6 +628,21 @@ def update_face():
         if now > state["blink_timer"]:
             state["is_blinking"] = True
             state["blink_end_time"] = now + 0.15 # Blink duration
+    
+    # Middle finger easter egg (rare)
+    if state["show_middle_finger"]:
+        if now > state["middle_finger_end_time"]:
+            state["show_middle_finger"] = False
+            state["middle_finger_timer"] = now + random.uniform(10.0, 20.0)
+    else:
+        if state["middle_finger_timer"] == 0:
+            state["middle_finger_timer"] = now + random.uniform(10.0, 20.0)
+        elif now > state["middle_finger_timer"]:
+            # 2% chance to show middle finger
+            if random.random() < 0.02:
+                state["show_middle_finger"] = True
+                state["middle_finger_end_time"] = now + 2.0  # Show for 2 seconds
+            state["middle_finger_timer"] = now + random.uniform(10.0, 20.0)
 
 def draw_face(screen):
     screen.fill(TEAL)
@@ -638,6 +658,13 @@ def draw_face(screen):
     
     if state["expression"] == "happy":
         pygame.draw.arc(screen, BLACK, (190, 170, 100, 50), 3.14, 6.28, 4)
+    
+    # Easter egg: middle finger
+    if state["show_middle_finger"]:
+        # Draw hand/fist at bottom center
+        pygame.draw.rect(screen, BLACK, (220, 240, 40, 30))  # Palm
+        # Draw middle finger extended upward
+        pygame.draw.rect(screen, BLACK, (232, 200, 16, 45))  # Finger
 
 def draw_menu(screen):
     screen.fill(WHITE)
@@ -970,6 +997,13 @@ def main():
                 else: 
                     state["mode"] = "MENU"
         
+        # --- INACTIVITY CHECK ---
+        # Return to FACE after 60s of inactivity, unless in a "focus" mode
+        if state["mode"] in ["MENU", "STATS", "CLOCK", "NOTES", "HEART", "SETTINGS", "GAMES"]:
+            if time.time() - state["last_interaction"] > 60:
+                print("Inactivity timeout: Returning to FACE")
+                state["mode"] = "FACE"
+
         # --- UPDATE & DRAW ---
         if state["mode"] == "STARTUP":
             update_startup()
