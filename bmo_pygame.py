@@ -65,6 +65,7 @@ BLUE = (52, 152, 219)
 GREEN = (46, 204, 113)
 GREEN_MOUTH = (39, 174, 96) # For the big smile
 GRAY = (127, 140, 141)
+ORANGE = (230, 126, 34)
 
 # Fonts
 try:
