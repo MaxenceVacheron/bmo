@@ -22,6 +22,8 @@ NEXTCLOUD_PATH = "/home/pi/mnt/nextcloud/shr/BMO_Agnes"
 CONFIG_FILE = "/home/pi/bmo/bmo_config.json"
 BMO_FACES_ROOT = "/home/pi/bmo/bmo_faces"
 IDLE_THOUGHT_DIR = "/home/pi/bmo/bmo_assets/idle/thought"
+MESSAGES_FILE = "/home/pi/bmo/messages.json"
+MESSAGES_URL = "http://bmo.pg.maxencevacheron.fr"
 
 def load_config():
     """Load configuration from file"""
@@ -103,6 +105,7 @@ MENUS = {
         {"label": "GAMES", "action": "MENU:GAMES", "color": YELLOW},
         {"label": "CLOCK", "action": "MODE:CLOCK", "color": BLUE},
         {"label": "WEATHER", "action": "MODE:WEATHER", "color": BLUE},
+        {"label": "MESSAGES", "action": "MODE:MESSAGES", "color": PINK},
         {"label": "SYSTEM", "action": "MODE:ADVANCED_STATS", "color": GRAY},
         {"label": "NOTES", "action": "MODE:NOTES", "color": RED},
         {"label": "HEART", "action": "MODE:HEART", "color": PINK},
@@ -273,8 +276,64 @@ state = {
     "click_feedback": {
         "pos": (0, 0),
         "time": 0
+    },
+    "messages": {
+        "list": [],
+        "unread": False,
+        "selected_index": 0,
+        "viewing_id": None
     }
 }
+
+def load_messages():
+    """Load messages from local storage"""
+    if os.path.exists(MESSAGES_FILE):
+        try:
+            with open(MESSAGES_FILE, 'r') as f:
+                data = json.load(f)
+                state["messages"]["list"] = data.get("messages", [])
+                # Check for unread (just a concept for now, maybe compare with last read ID)
+        except Exception as e:
+            print(f"Error loading messages: {e}")
+
+def save_messages():
+    """Save messages to local storage"""
+    try:
+        with open(MESSAGES_FILE, 'w') as f:
+            json.dump({"messages": state["messages"]["list"]}, f)
+    except Exception as e:
+        print(f"Error saving messages: {e}")
+
+def fetch_remote_messages():
+    """Fetch new messages from remote API and merge"""
+    while True:
+        try:
+            print("✉️ Fetching messages...")
+            with urllib.request.urlopen(MESSAGES_URL, timeout=10) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    new_msgs = data.get("messages", [])
+                    
+                    # Merge logic
+                    existing_ids = {m["id"] for m in state["messages"]["list"]}
+                    added = False
+                    for m in new_msgs:
+                        if m["id"] not in existing_ids:
+                            state["messages"]["list"].append(m)
+                            state["messages"]["unread"] = True
+                            added = True
+                    
+                    if added:
+                        # Sort by timestamp (newest first)
+                        state["messages"]["list"].sort(key=lambda x: x.get("timestamp", 0), reverse=True)
+                        save_messages()
+                        state["needs_redraw"] = True
+                        print(f"📩 Received {len(new_msgs)} messages!")
+        except Exception as e:
+            print(f"Error fetching messages: {e}")
+        
+        # Poll every 5 minutes
+        time.sleep(300)
 
 # --- SYSTEM STATS ---
 def get_cpu_temp():
@@ -1201,6 +1260,12 @@ def draw_click_crosshair(screen):
         screen.blit(cross_surf, (x - 15, y - 15))
         state["needs_redraw"] = True
 
+    # Draw Message Notification if on Face
+    if state["mode"] == "FACE" and state["messages"]["unread"]:
+        pygame.draw.circle(screen, RED, (WIDTH - 30, HEIGHT - 30), 12)
+        txt = FONT_TINY.render("!", False, WHITE)
+        screen.blit(txt, (WIDTH - 30 - txt.get_width()//2, HEIGHT - 30 - txt.get_height()//2))
+
 def draw_menu(screen):
     screen.fill(WHITE)
     current_menu_id = state["menu_stack"][-1]
@@ -1315,6 +1380,90 @@ def draw_notes(screen):
         screen.blit(surf, (WIDTH//2 - surf.get_width()//2, y))
         y += 40
 
+def draw_messages_menu(screen):
+    screen.fill(PINK)
+    pygame.draw.rect(screen, BLACK, (0, 0, WIDTH, 50))
+    title = FONT_MEDIUM.render("BMO INBOX", False, WHITE)
+    screen.blit(title, (WIDTH//2 - title.get_width()//2, 10))
+    
+    msgs = state["messages"]["list"]
+    if not msgs:
+        lbl = FONT_SMALL.render("No messages yet!", False, BLACK)
+        screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, HEIGHT//2))
+    else:
+        # Pagination for messages
+        items_per_page = 4
+        page = state["menu_page"]
+        start_idx = page * items_per_page
+        visible = msgs[start_idx:start_idx + items_per_page]
+        
+        for i, m in enumerate(visible):
+            y = 60 + i * 55
+            rect = (20, y, 440, 50)
+            pygame.draw.rect(screen, WHITE, rect, border_radius=10)
+            pygame.draw.rect(screen, BLACK, rect, 2, border_radius=10)
+            
+            sender = m.get("sender", "Unknown")
+            # Truncate content if too long for preview
+            content = m.get("content", "")
+            if len(content) > 30: content = content[:27] + "..."
+            
+            lbl_s = FONT_TINY.render(f"From: {sender}", False, BLACK)
+            lbl_c = FONT_SMALL.render(content, False, BLACK)
+            screen.blit(lbl_s, (40, y + 5))
+            screen.blit(lbl_c, (40, y + 22))
+            
+        # Draw Nav
+        nav_y = 280
+        if page > 0:
+            lbl = FONT_TINY.render("< PREV", False, BLACK)
+            screen.blit(lbl, (20, nav_y))
+        if len(msgs) > (page + 1) * items_per_page:
+            lbl = FONT_TINY.render("NEXT >", False, BLACK)
+            screen.blit(lbl, (WIDTH - 80, nav_y))
+            
+    # Exit Button (Fixed position)
+    pygame.draw.rect(screen, GRAY, (WIDTH//2 - 40, 280, 80, 30), border_radius=5)
+    lbl = FONT_TINY.render("EXIT", False, WHITE)
+    screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, 287))
+
+def draw_message_view(screen):
+    screen.fill(WHITE)
+    msg_id = state["messages"]["viewing_id"]
+    msg = next((m for m in state["messages"]["list"] if m["id"] == msg_id), None)
+    
+    if not msg:
+        state["mode"] = "MESSAGES"
+        return
+        
+    pygame.draw.rect(screen, BLACK, (0, 0, WIDTH, 50))
+    title = FONT_SMALL.render(f"Message from {msg.get('sender', '...')}", False, WHITE)
+    screen.blit(title, (WIDTH//2 - title.get_width()//2, 15))
+    
+    # Word wrap content
+    content = msg.get("content", "")
+    words = content.split(' ')
+    lines = []
+    line = []
+    for w in words:
+        line.append(w)
+        if FONT_SMALL.size(' '.join(line))[0] > 440:
+            line.pop()
+            lines.append(' '.join(line))
+            line = [w]
+    lines.append(' '.join(line))
+    
+    y = 70
+    for l in lines:
+        surf = FONT_SMALL.render(l, False, BLACK)
+        screen.blit(surf, (20, y))
+        y += 25
+        
+    # Back Button
+    pygame.draw.rect(screen, GRAY, (WIDTH//2 - 50, 270, 100, 40), border_radius=10)
+    lbl = FONT_SMALL.render("BACK", False, WHITE)
+    screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, 280))
+
 def draw_heart(screen):
     screen.fill(PINK)
     pulse = (time.time() * 3) % 1.5
@@ -1413,6 +1562,12 @@ def main():
     state["brightness"] = config.get("brightness", 1.0)
     state["default_mode"] = config.get("default_mode", "FACE")
     state["power_save"] = config.get("power_save", False)
+
+    # Load messages
+    load_messages()
+
+    # Start message fetcher thread
+    threading.Thread(target=fetch_remote_messages, daemon=True).start()
 
     # Initial Power Save enforcement
     if state["power_save"]:
@@ -1534,6 +1689,7 @@ def main():
                         elif action.startswith("MODE:"):
                             state["mode"] = action.split(":")[1]
                             state["menu_page"] = 0
+                            if state["mode"] == "MESSAGES": state["messages"]["unread"] = False # Mark inbox as seen
                             if state["mode"] == "NOTES": state["love_note"] = random.choice(LOVE_NOTES)
                             if state["mode"] == "SNAKE": state["snake"] = None # Reset game
                         elif action.startswith("SLIDESHOW:"):
@@ -1621,6 +1777,29 @@ def main():
                         # CENTER: Exit to menu
                         state["mode"] = "MENU"
                 
+                elif state["mode"] == "MESSAGES":
+                    # Exit
+                    if HEIGHT - 50 < y < HEIGHT:
+                        if WIDTH / 2 - 50 < x < WIDTH / 2 + 50:
+                            state["mode"] = "MENU"
+                    # Pagination
+                    elif y > 260:
+                        if x < 100 and state["menu_page"] > 0: state["menu_page"] -= 1
+                        elif x > WIDTH - 100:
+                            if len(state["messages"]["list"]) > (state["menu_page"] + 1) * 4:
+                                state["menu_page"] += 1
+                    # Message Selection
+                    elif 60 <= y < 280:
+                        idx = (y - 60) // 55
+                        real_idx = (state["menu_page"] * 4) + int(idx)
+                        if real_idx < len(state["messages"]["list"]):
+                            state["messages"]["viewing_id"] = state["messages"]["list"][real_idx]["id"]
+                            state["mode"] = "MESSAGE_VIEW"
+                
+                elif state["mode"] == "MESSAGE_VIEW":
+                    # All clicks return to inbox (simple nav)
+                    state["mode"] = "MESSAGES"
+                
                 elif state["mode"] == "SNAKE":
                     if state["snake"]:
                         if state["snake"].game_over:
@@ -1693,6 +1872,8 @@ def main():
             elif state["mode"] == "CLOCK": draw_clock(screen)
             elif state["mode"] == "NOTES": draw_notes(screen)
             elif state["mode"] == "HEART": draw_heart(screen)
+            elif state["mode"] == "MESSAGES": draw_messages_menu(screen)
+            elif state["mode"] == "MESSAGE_VIEW": draw_message_view(screen)
             elif state["mode"] == "SNAKE":
                 state["snake"].draw(screen)
 
