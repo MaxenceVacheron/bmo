@@ -283,6 +283,9 @@ def start_gif_player(subdir):
         print(f"No GIFs found in {path}")
         state["mode"] = "MENU"
         return
+    
+    # Shuffle for random order
+    random.shuffle(state["gif_player"]["gifs"])
         
     state["gif_player"]["current_gif_index"] = 0
     state["gif_player"]["gif_switch_time"] = time.time()
