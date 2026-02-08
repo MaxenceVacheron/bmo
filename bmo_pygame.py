@@ -18,6 +18,7 @@ TOUCH_DEVICE = "/dev/input/event4" # SPI-connected touch panel on CS1
 NEXTCLOUD_PATH = "/home/pi/mnt/nextcloud/shr/BMO_Agnes"
 CONFIG_FILE = "/home/pi/bmo/bmo_config.json"
 BMO_FACES_ROOT = "/home/pi/bmo/bmo_faces"
+IDLE_THOUGHT_DIR = "/home/pi/bmo/bmo_assets/idle/thought"
 
 def load_config():
     """Load configuration from file"""
@@ -181,6 +182,20 @@ state = {
     "current_face_closed": None,
     "last_face_switch": 0,
     "needs_redraw": True,
+    "idle": {
+        "thought": {
+            "is_active": False,
+            "end_time": 0,
+            "next_time": time.time(), # Force first one immediately
+            "current_image": None
+        },
+        "humming": {
+            "is_active": False,
+            "end_time": 0,
+            "next_time": time.time() + 20,
+            "notes": []
+        }
+    },
     "startup": {
         "message": "Hello Agnès! I'm BMO. Maxence built my brain just for you.",
         "char_index": 0,
@@ -656,6 +671,23 @@ def load_random_face(emotion=None):
             print(f"Error loading face images: {e}")
             sys.stdout.flush()
 
+def load_thought_bubble():
+    """Load a random thought bubble icon"""
+    if not os.path.exists(IDLE_THOUGHT_DIR): return None
+    files = [f for f in os.listdir(IDLE_THOUGHT_DIR) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+    if not files: return None
+    path = os.path.join(IDLE_THOUGHT_DIR, random.choice(files))
+    try:
+        img = Image.open(path).convert('RGBA')
+        img = img.resize((64, 64), Image.Resampling.LANCZOS)
+        # Convert to Pygame
+        data = img.tobytes()
+        pygame_img = pygame.image.fromstring(data, img.size, img.mode)
+        return pygame_img
+    except Exception as e:
+        print(f"Error loading thought bubble: {e}")
+        return None
+
 # --- FOCUS MODE FUNCTIONS ---
 def start_focus_timer(minutes):
     state["focus"]["duration"] = minutes * 60
@@ -751,6 +783,68 @@ def update_face():
             state["needs_redraw"] = True
             print("BMO Blink!")
             sys.stdout.flush()
+            
+    # --- IDLE BEHAVIORS ---
+    # 1. Thought Bubbles
+    if not state["idle"]["thought"]["is_active"]:
+        if now > state["idle"]["thought"]["next_time"]:
+            surf = load_thought_bubble()
+            if surf:
+                state["idle"]["thought"]["is_active"] = True
+                state["idle"]["thought"]["current_image"] = surf
+                state["idle"]["thought"]["end_time"] = now + random.uniform(5, 10)
+                state["needs_redraw"] = True
+                print("BMO is thinking...")
+                sys.stdout.flush()
+    else:
+        if now > state["idle"]["thought"]["end_time"]:
+            state["idle"]["thought"]["is_active"] = False
+            state["idle"]["thought"]["next_time"] = now + random.uniform(30, 120)
+            state["needs_redraw"] = True
+
+    # 2. Humming (Only when positive)
+    if state["emotion"] == "positive":
+        if not state["idle"]["humming"]["is_active"]:
+            if now > state["idle"]["humming"]["next_time"]:
+                state["idle"]["humming"]["is_active"] = True
+                state["idle"]["humming"]["end_time"] = now + random.uniform(6, 12)
+                state["idle"]["humming"]["notes"] = []
+                state["needs_redraw"] = True
+                print("BMO is humming...")
+                sys.stdout.flush()
+        else:
+            if now > state["idle"]["humming"]["end_time"]:
+                if not state["idle"]["humming"]["notes"]: # Wait for notes to vanish
+                    state["idle"]["humming"]["is_active"] = False
+                    state["idle"]["humming"]["next_time"] = now + random.uniform(20, 90)
+                    state["needs_redraw"] = True
+            
+            # Spawn new notes
+            if now < state["idle"]["humming"]["end_time"] and random.random() < 0.1:
+                state["idle"]["humming"]["notes"].append({
+                    "pos": [random.uniform(100, WIDTH-100), 280],
+                    "vel": [random.uniform(-0.5, 0.5), random.uniform(-1.5, -2.5)],
+                    "start": now,
+                    "life": random.uniform(2, 4)
+                })
+
+            # Update notes
+            still_alive = []
+            for n in state["idle"]["humming"]["notes"]:
+                if now - n["start"] < n["life"]:
+                    n["pos"][0] += n["vel"][0]
+                    n["pos"][1] += n["vel"][1]
+                    still_alive.append(n)
+                    state["needs_redraw"] = True
+            state["idle"]["humming"]["notes"] = still_alive
+
+def draw_music_note(screen, pos, alpha):
+    """Draw a procedural music note"""
+    x, y = int(pos[0]), int(pos[1])
+    # Simple quaver
+    pygame.draw.circle(screen, BLACK, (x, y), 6)
+    pygame.draw.line(screen, BLACK, (x+4, y), (x+4, y-18), 2)
+    pygame.draw.line(screen, BLACK, (x+4, y-18), (x+12, y-12), 3)
 
 def draw_face(screen):
     # No need to fill with BLACK if we are blitting a full-screen image
@@ -767,6 +861,22 @@ def draw_face(screen):
         pygame.draw.circle(screen, BLACK, (140, 120), 9)
         pygame.draw.circle(screen, BLACK, (340, 120), 9)
         pygame.draw.arc(screen, BLACK, (210, 140, 60, 40), 3.14, 6.28, 4)
+        
+    # --- IDLE OVERLAYS ---
+    # 1. Thought Bubble (Top Right)
+    if state["idle"]["thought"]["is_active"] and state["idle"]["thought"]["current_image"]:
+        # Cloud position
+        bx, by = WIDTH - 100, 30
+        # Draw actual bubble icon
+        screen.blit(state["idle"]["thought"]["current_image"], (bx, by))
+        # Draw small trail circles (comic book style)
+        pygame.draw.circle(screen, WHITE, (bx - 10, by + 50), 8)
+        pygame.draw.circle(screen, WHITE, (bx - 25, by + 65), 5)
+        
+    # 2. Humming Notes
+    if state["idle"]["humming"]["is_active"] or state["idle"]["humming"]["notes"]:
+        for n in state["idle"]["humming"]["notes"]:
+            draw_music_note(screen, n["pos"], 1.0) # Procedural note
 
 def draw_menu(screen):
     screen.fill(WHITE)
