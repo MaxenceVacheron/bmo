@@ -66,12 +66,12 @@ MENUS = {
         {"label": "FACE", "action": "MODE:FACE", "color": TEAL},
         {"label": "FOCUS", "action": "MENU:FOCUS", "color": GREEN}, # New Focus Menu
         {"label": "NEXTCLOUD", "action": "MENU:NEXTCLOUD", "color": BLUE},
+        {"label": "GAMES", "action": "MENU:GAMES", "color": YELLOW},
         {"label": "STATS", "action": "MODE:STATS", "color": YELLOW},
         {"label": "CLOCK", "action": "MODE:CLOCK", "color": BLUE},
         {"label": "NOTES", "action": "MODE:NOTES", "color": RED},
         {"label": "HEART", "action": "MODE:HEART", "color": PINK},
         {"label": "SETTINGS", "action": "MENU:SETTINGS", "color": GRAY},
-        {"label": "GAMES", "action": "MENU:GAMES", "color": YELLOW},
     ],
     "GAMES": [
         {"label": "SNAKE", "action": "MODE:SNAKE", "color": GREEN},
