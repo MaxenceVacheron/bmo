@@ -730,9 +730,12 @@ def update_face():
     """Update BMO's face state (blinking and image rotation)"""
     now = time.time()
     
-    # Rotate face every 45 seconds (increased frequency)
-    if now - state["last_face_switch"] > 45:
-        print("Rotating face image...")
+    # Dynamic rotation interval based on emotion
+    # Positive = 45s, Negative = 22.5s (2x shorter)
+    interval = 22.5 if state.get("emotion") == "negative" else 45.0
+    
+    if now - state["last_face_switch"] > interval:
+        print(f"Rotating face image (Emotion: {state.get('emotion')}, Interval: {interval}s)...")
         load_random_face()
     
     # Blinking logic (decreased frequency: 8-20 seconds)
