@@ -256,6 +256,10 @@ state = {
         "last_decay": time.time(),
         "hearts": [], # Floating hearts: {"pos": [x,y], "vel": [vx,vy], "life": t}
         "show_interaction": False # Whether to show feeding/playing buttons
+    },
+    "click_feedback": {
+        "pos": (0, 0),
+        "time": 0
     }
 }
 
@@ -1140,6 +1144,31 @@ def draw_face(screen):
         pygame.draw.circle(screen, PINK, (int(hx+4), int(hy)), 5)
         pygame.draw.polygon(screen, PINK, [(int(hx-9), int(hy+2)), (int(hx+9), int(hy+2)), (int(hx), int(hy+10))])
 
+def draw_click_crosshair(screen):
+    """Draw a visual crosshair feedback at the last click position"""
+    now = time.time()
+    diff = now - state["click_feedback"]["time"]
+    if diff < 1.0:
+        x, y = state["click_feedback"]["pos"]
+        # Fade out effect
+        alpha = int(255 * (1.0 - diff))
+        # Use a temporary surface for alpha crosshair
+        cross_surf = pygame.Surface((40, 40), pygame.SRCALPHA)
+        color = (255, 255, 255, alpha)
+        # Draw circle
+        pygame.draw.circle(cross_surf, color, (20, 20), 10, 2)
+        # Draw cross lines
+        pygame.draw.line(cross_surf, color, (20, 5), (20, 15), 2)
+        pygame.draw.line(cross_surf, color, (20, 25), (20, 35), 2)
+        pygame.draw.line(cross_surf, color, (int(WIDTH/2-15+x-x), 20), (int(WIDTH/2-5+x-x), 20), 2) # Just kidding on the math
+        # Real lines:
+        pygame.draw.line(cross_surf, color, (5, 20), (15, 20), 2)
+        pygame.draw.line(cross_surf, color, (25, 20), (35, 20), 2)
+        
+        screen.blit(cross_surf, (x - 20, y - 20))
+        # Keep redraw active during the 1s window
+        state["needs_redraw"] = True
+
 def draw_menu(screen):
     screen.fill(WHITE)
     current_menu_id = state["menu_stack"][-1]
@@ -1358,6 +1387,9 @@ def main():
                 if len(state["tap_times"]) == 5:
                     if state["tap_times"][-1] - state["tap_times"][0] < 2.0:
                         auto_update_and_restart()
+
+                state["click_feedback"]["pos"] = (x, y)
+                state["click_feedback"]["time"] = now
 
                 state["last_touch_pos"] = (x, y)
                 state["last_touch_pos_time"] = now
@@ -1591,7 +1623,10 @@ def main():
             elif state["mode"] == "SNAKE":
                 state["snake"].draw(screen)
 
-            # 2. Dimming (Apply directly before write)
+            # 2. Visual Feedback Layer (Crosshair)
+            draw_click_crosshair(screen)
+
+            # 3. Dimming (Apply directly before write)
             if state["brightness"] < 1.0:
                 if state["cached_dim_surf"] is None or state["last_brightness"] != state["brightness"]:
                     dim_val = int(state["brightness"] * 255)
