@@ -6,6 +6,7 @@ import pygame
 import threading
 import math
 from evdev import InputDevice, ecodes
+from PIL import Image
 
 # --- CONFIGURATION ---
 WIDTH, HEIGHT = 480, 320
@@ -17,11 +18,8 @@ NEXTCLOUD_PATH = "/home/pi/mnt/nextcloud/shr/BMO_Agnes"
 os.environ["SDL_VIDEODRIVER"] = "dummy"
 pygame.init()
 
-# Create Surface matching Framebuffer format (BGR565) - Raspberry Pi uses BGR!
-# B mask: 1111100000000000 (0xF800)
-# G mask: 0000011111100000 (0x07E0)
-# R mask: 0000000000011111 (0x001F)
-screen = pygame.Surface((WIDTH, HEIGHT), depth=16, masks=(0x001F, 0x07E0, 0xF800, 0))
+# Create Surface matching Framebuffer format (RGB565)
+screen = pygame.Surface((WIDTH, HEIGHT), depth=16, masks=(0xF800, 0x07E0, 0x001F, 0))
 
 # Colors
 BLACK = (20, 24, 28)
@@ -190,17 +188,29 @@ def update_slideshow():
 
         try:
             img_path = imgs[state["slideshow"]["index"]]
-            img = pygame.image.load(img_path)
             
-            # Scale first (on original format)
-            img_rect = img.get_rect()
-            scale = min(WIDTH / img_rect.width, HEIGHT / img_rect.height)
-            new_size = (int(img_rect.width * scale), int(img_rect.height * scale))
-            img = pygame.transform.scale(img, new_size)
+            # Load with PIL (better format handling)
+            pil_img = Image.open(img_path)
+            pil_img = pil_img.convert('RGB')  # Force RGB
             
-            # Convert to screen format by creating a surface with same format (BGR565)
-            converted = pygame.Surface(img.get_size(), depth=16, masks=(0x001F, 0x07E0, 0xF800, 0))
-            converted.blit(img, (0, 0))
+            # Calculate scaling
+            img_w, img_h = pil_img.size
+            scale = min(WIDTH / img_w, HEIGHT / img_h)
+            new_size = (int(img_w * scale), int(img_h * scale))
+            
+            # Resize with PIL (high quality)
+            pil_img = pil_img.resize(new_size, Image.Resampling.LANCZOS)
+            
+            # Convert PIL to Pygame surface
+            mode = pil_img.mode
+            size = pil_img.size
+            data = pil_img.tobytes()
+            
+            pygame_img = pygame.image.fromstring(data, size, mode)
+            
+            # Convert to screen format
+            converted = pygame.Surface(pygame_img.get_size(), depth=16, masks=(0xF800, 0x07E0, 0x001F, 0))
+            converted.blit(pygame_img, (0, 0))
             
             state["slideshow"]["current_surface"] = converted
             state["slideshow"]["index"] = (state["slideshow"]["index"] + 1) % len(imgs)
