@@ -39,14 +39,17 @@ try:
     FONT_LARGE = pygame.font.Font("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 60)
     FONT_MEDIUM = pygame.font.Font("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 35)
     FONT_SMALL = pygame.font.Font("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
+    # Smaller font for timer
+    FONT_TINY = pygame.font.Font("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 15)
 except:
     FONT_LARGE = pygame.font.SysFont(None, 60)
     FONT_MEDIUM = pygame.font.SysFont(None, 35)
     FONT_SMALL = pygame.font.SysFont(None, 20)
+    FONT_TINY = pygame.font.SysFont(None, 15)
 
 # State
 state = {
-    "mode": "FACE", # FACE, MENU, STATS, CLOCK, NOTES, HEART, SLIDESHOW, TEXT_VIEWER
+    "mode": "FACE", # FACE, MENU, STATS, CLOCK, NOTES, HEART, SLIDESHOW, TEXT_VIEWER, FOCUS
     "expression": "happy",
     "last_interaction": 0,
     "love_note": "You are amazing!",
@@ -62,6 +65,12 @@ state = {
         "content": [],
         "scroll_y": 0,
         "path": ""
+    },
+    "focus": {
+        "end_time": 0,
+        "duration": 0,
+        "active": False,
+        "blink_timer": 0
     }
 }
 
@@ -80,11 +89,19 @@ LOVE_NOTES = [
 MENUS = {
     "MAIN": [
         {"label": "FACE", "action": "MODE:FACE", "color": TEAL},
+        {"label": "FOCUS", "action": "MENU:FOCUS", "color": GREEN}, # New Focus Menu
+        {"label": "NEXTCLOUD", "action": "MENU:NEXTCLOUD", "color": BLUE},
         {"label": "STATS", "action": "MODE:STATS", "color": YELLOW},
-        {"label": "NEXTCLOUD", "action": "MENU:NEXTCLOUD", "color": BLUE}, # New!
         {"label": "CLOCK", "action": "MODE:CLOCK", "color": BLUE},
         {"label": "NOTES", "action": "MODE:NOTES", "color": RED},
         {"label": "HEART", "action": "MODE:HEART", "color": PINK},
+    ],
+    "FOCUS": [
+        {"label": "15 MIN", "action": "FOCUS:15", "color": GREEN},
+        {"label": "25 MIN (Pomo)", "action": "FOCUS:25", "color": TEAL},
+        {"label": "45 MIN", "action": "FOCUS:45", "color": YELLOW},
+        {"label": "60 MIN", "action": "FOCUS:60", "color": RED},
+        {"label": "< BACK", "action": "BACK", "color": GRAY},
     ],
     "NEXTCLOUD": [
         {"label": "PHOTOS", "action": "MENU:PHOTOS", "color": YELLOW},
@@ -152,52 +169,39 @@ def start_slideshow(subdir):
     state["slideshow"]["path"] = path
     state["slideshow"]["images"] = []
     
-    # Scan for images
     if os.path.exists(path):
         for f in os.listdir(path):
             if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp')):
                 state["slideshow"]["images"].append(os.path.join(path, f))
     
     if not state["slideshow"]["images"]:
-        print(f"No images found in {path}")
         state["slideshow"]["images"] = ["PLACEHOLDER_EMPTY"]
         
     state["slideshow"]["index"] = 0
-    state["slideshow"]["last_switch"] = 0 # Force immediate load
+    state["slideshow"]["last_switch"] = 0
     state["mode"] = "SLIDESHOW"
 
 def update_slideshow():
-    # Check if time to switch
     if time.time() - state["slideshow"]["last_switch"] > 5.0:
         state["slideshow"]["last_switch"] = time.time()
         
         imgs = state["slideshow"]["images"]
-        if not imgs or imgs[0] == "PLACEHOLDER_EMPTY":
-            return # Nothing to do
+        if not imgs or imgs[0] == "PLACEHOLDER_EMPTY": return
 
-        # Load next image
         try:
             img_path = imgs[state["slideshow"]["index"]]
             img = pygame.image.load(img_path)
-            
-            # Scale to fit (maintain aspect ratio)
             img_rect = img.get_rect()
             scale = min(WIDTH / img_rect.width, HEIGHT / img_rect.height)
             new_size = (int(img_rect.width * scale), int(img_rect.height * scale))
             img = pygame.transform.scale(img, new_size)
-            
             state["slideshow"]["current_surface"] = img
-            
-            # Next index
             state["slideshow"]["index"] = (state["slideshow"]["index"] + 1) % len(imgs)
         except Exception as e:
-            print(f"Error loading image: {e}")
-            # Skip this image next time?
             state["slideshow"]["index"] = (state["slideshow"]["index"] + 1) % len(imgs)
 
 def draw_slideshow(screen):
     screen.fill(BLACK)
-    
     if not state["slideshow"]["images"] or state["slideshow"]["images"][0] == "PLACEHOLDER_EMPTY":
         txt = FONT_MEDIUM.render("No Images Found", False, WHITE)
         screen.blit(txt, (WIDTH//2 - txt.get_width()//2, HEIGHT//2))
@@ -205,7 +209,6 @@ def draw_slideshow(screen):
 
     surf = state["slideshow"]["current_surface"]
     if surf:
-        # Center the image
         x = (WIDTH - surf.get_width()) // 2
         y = (HEIGHT - surf.get_height()) // 2
         screen.blit(surf, (x, y))
@@ -213,11 +216,6 @@ def draw_slideshow(screen):
 # --- TEXT VIEWER FUNCTIONS ---
 def start_text_viewer(subdir):
     path = os.path.join(NEXTCLOUD_PATH, "Textes", subdir)
-    # Find first txt file? Or list them?
-    # User said "display a slideshow of photos... text same, either personal or remote".
-    # Assuming one big text file or all text files?
-    # Let's try to find ANY .txt file in the folder.
-    
     found_file = None
     if os.path.exists(path):
         for f in os.listdir(path):
@@ -230,7 +228,6 @@ def start_text_viewer(subdir):
         try:
             with open(found_file, 'r') as f:
                 content = f.read()
-                # Wrap text
                 words = content.split(' ')
                 line = []
                 for w in words:
@@ -249,17 +246,83 @@ def start_text_viewer(subdir):
 
 def draw_text_viewer(screen):
     screen.fill(BLACK)
-    
     y = 20
     for line in state["text_viewer"]["content"]:
-        if y > HEIGHT - 20: break # Simple clipping
+        if y > HEIGHT - 20: break
         txt = FONT_SMALL.render(line, False, WHITE)
         screen.blit(txt, (20, y))
         y += 25
-    
-    # Scroll indicator or helper
     hint = FONT_SMALL.render("Tap to Close", False, GRAY)
     screen.blit(hint, (WIDTH - hint.get_width() - 10, HEIGHT - 30))
+
+# --- FOCUS MODE FUNCTIONS ---
+def start_focus_timer(minutes):
+    state["focus"]["duration"] = minutes * 60
+    state["focus"]["end_time"] = time.time() + (minutes * 60)
+    state["focus"]["active"] = True
+    state["mode"] = "FOCUS"
+
+def draw_focus_face(screen):
+    screen.fill(TEAL)
+    
+    remaining = state["focus"]["end_time"] - time.time()
+    
+    if remaining <= 0:
+        # Time's Up! Celebrate!
+        state["focus"]["active"] = False
+        
+        # Happy Face (Eyes Closed >_< or Excitement)
+        # Left Eye (>)
+        pygame.draw.lines(screen, BLACK, False, [(125, 110), (140, 125), (125, 140)], 5)
+        # Right Eye (<)
+        pygame.draw.lines(screen, BLACK, False, [(355, 110), (340, 125), (355, 140)], 5)
+        
+        # Mouth (Open D)
+        pygame.draw.circle(screen, BLACK, (240, 200), 40) # Filled mouth
+        pygame.draw.rect(screen, TEAL, (200, 160, 80, 40)) # Cut top half
+        
+        # Text
+        txt = FONT_MEDIUM.render("GOOD JOB!", False, BLACK)
+        screen.blit(txt, (WIDTH//2 - txt.get_width()//2, 50))
+        
+        hint = FONT_SMALL.render("Tap to finish", False, BLACK)
+        screen.blit(hint, (WIDTH//2 - hint.get_width()//2, 280))
+        
+        return
+
+    # Focus Mode (Glasses)
+    # Glasses Frames (Squares)
+    pygame.draw.rect(screen, BLACK, (110, 90, 60, 60), 4) # Left lens
+    pygame.draw.rect(screen, BLACK, (310, 90, 60, 60), 4) # Right lens
+    # Bridge
+    pygame.draw.line(screen, BLACK, (170, 120), (310, 120), 4)
+    # Sides
+    pygame.draw.line(screen, BLACK, (110, 120), (60, 110), 4)
+    pygame.draw.line(screen, BLACK, (370, 120), (420, 110), 4)
+    
+    # Eyes (Small dots focused)
+    pygame.draw.circle(screen, BLACK, (140, 120), 5)
+    pygame.draw.circle(screen, BLACK, (340, 120), 5)
+    
+    # Mouth (Concentrated line)
+    pygame.draw.line(screen, BLACK, (220, 200), (260, 200), 4)
+    
+    # Timer Text
+    mins = int(remaining // 60)
+    secs = int(remaining % 60)
+    timer_txt = f"{mins:02d}:{secs:02d}"
+    
+    txt = FONT_MEDIUM.render(timer_txt, False, BLACK)
+    # Background for timer text for readability
+    # pygame.draw.rect(screen, WHITE, (WIDTH//2 - 50, 250, 100, 40))
+    screen.blit(txt, (WIDTH//2 - txt.get_width()//2, 260))
+    
+    # Progress Bar at bottom
+    total = state["focus"]["duration"]
+    progress = 1.0 - (remaining / total)
+    pygame.draw.rect(screen, BLACK, (40, 300, 400, 10), 1)
+    pygame.draw.rect(screen, GREEN, (41, 301, int(398 * progress), 8))
+
 
 # --- COMMON DRAWING ---
 def draw_face(screen):
@@ -268,35 +331,26 @@ def draw_face(screen):
     pygame.draw.circle(screen, BLACK, (340, 120), 15)
     
     if state["expression"] == "happy":
-        # Simple Round Smile (Arc)
         pygame.draw.arc(screen, BLACK, (190, 170, 100, 50), 3.14, 6.28, 4)
-    # No Cheeks
 
 def draw_menu(screen):
     screen.fill(WHITE)
-    
-    # Get current menu from stack
     current_menu_id = state["menu_stack"][-1]
     items = MENUS.get(current_menu_id, MENUS["MAIN"])
     
-    # Header
     pygame.draw.rect(screen, BLACK, (0, 0, WIDTH, 50))
     title = FONT_MEDIUM.render(f"BMO MENU: {current_menu_id}", False, WHITE)
     screen.blit(title, (WIDTH//2 - title.get_width()//2, 10))
-    
-    # Calculate layout to center items vertically? Or scroll?
-    # Max 6 items fit easily.
     
     start_y = 60
     item_height = 40
     margin = 5
     
-    visible_items = items[:6] # Limit display
+    visible_items = items[:6]
     
     for i, item in enumerate(visible_items):
         y = start_y + i * (item_height + margin)
         btn_rect = (40, y, 400, item_height)
-        
         pygame.draw.rect(screen, item.get("color", GRAY), btn_rect)
         lbl = FONT_SMALL.render(item["label"], False, BLACK)
         screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, y + 10))
@@ -305,14 +359,12 @@ def draw_stats(screen):
     screen.fill(YELLOW)
     temp = get_cpu_temp()
     ram = get_ram_usage()
-    
     y = 40
     lbl = FONT_MEDIUM.render(f"CPU: {temp:.1f}C", False, BLACK)
     screen.blit(lbl, (40, y))
     pygame.draw.rect(screen, BLACK, (40, y+40, 400, 30), 2)
     w = int(396 * (temp / 85.0))
     pygame.draw.rect(screen, RED if temp > 60 else GREEN, (42, y+42, w, 26))
-    
     y += 100
     lbl = FONT_MEDIUM.render(f"RAM: {ram:.1f}%", False, BLACK)
     screen.blit(lbl, (40, y))
@@ -342,7 +394,6 @@ def draw_notes(screen):
             lines.append(' '.join(line))
             line = [w]
     lines.append(' '.join(line))
-    
     y = 100
     for l in lines:
         surf = FONT_MEDIUM.render(l, False, WHITE)
@@ -353,7 +404,6 @@ def draw_heart(screen):
     screen.fill(PINK)
     pulse = (time.time() * 3) % 1.5
     scale = 1.0 + (pulse if pulse < 0.5 else 0)
-    
     center = (WIDTH//2, HEIGHT//2)
     size = 20 * scale
     pts = [
@@ -366,32 +416,90 @@ def draw_heart(screen):
     ]
     pygame.draw.polygon(screen, RED, pts)
 
+# --- FOCUS MODE FUNCTIONS ---
+def start_focus_timer(minutes):
+    state["focus"]["duration"] = minutes * 60
+    state["focus"]["end_time"] = time.time() + (minutes * 60)
+    state["focus"]["active"] = True
+    state["mode"] = "FOCUS"
+
+def draw_focus_face(screen):
+    screen.fill(TEAL)
+    
+    remaining = state["focus"]["end_time"] - time.time()
+    
+    if remaining <= 0:
+        # Time's Up! Celebrate!
+        state["focus"]["active"] = False
+        
+        # Happy Face (Eyes Closed >_< or Excitement)
+        # Left Eye (>)
+        pygame.draw.lines(screen, BLACK, False, [(125, 110), (140, 125), (125, 140)], 5)
+        # Right Eye (<)
+        pygame.draw.lines(screen, BLACK, False, [(355, 110), (340, 125), (355, 140)], 5)
+        
+        # Mouth (Open D)
+        pygame.draw.circle(screen, BLACK, (240, 200), 40) # Filled mouth
+        pygame.draw.rect(screen, TEAL, (200, 160, 80, 40)) # Cut top half
+        
+        # Text
+        txt = FONT_MEDIUM.render("GOOD JOB!", False, BLACK)
+        screen.blit(txt, (WIDTH//2 - txt.get_width()//2, 50))
+        
+        hint = FONT_SMALL.render("Tap to finish", False, BLACK)
+        screen.blit(hint, (WIDTH//2 - hint.get_width()//2, 280))
+        
+        return
+
+    # Focus Mode (Glasses)
+    # Glasses Frames (Squares)
+    pygame.draw.rect(screen, BLACK, (110, 90, 60, 60), 4) # Left lens
+    pygame.draw.rect(screen, BLACK, (310, 90, 60, 60), 4) # Right lens
+    # Bridge
+    pygame.draw.line(screen, BLACK, (170, 120), (310, 120), 4)
+    # Sides
+    pygame.draw.line(screen, BLACK, (110, 120), (60, 110), 4)
+    pygame.draw.line(screen, BLACK, (370, 120), (420, 110), 4)
+    
+    # Eyes (Small dots focused)
+    pygame.draw.circle(screen, BLACK, (140, 120), 5)
+    pygame.draw.circle(screen, BLACK, (340, 120), 5)
+    
+    # Mouth (Concentrated line)
+    pygame.draw.line(screen, BLACK, (220, 200), (260, 200), 4)
+    
+    # Timer Text
+    mins = int(remaining // 60)
+    secs = int(remaining % 60)
+    timer_txt = f"{mins:02d}:{secs:02d}"
+    
+    txt = FONT_MEDIUM.render(timer_txt, False, BLACK)
+    # Background for timer text for readability
+    # pygame.draw.rect(screen, WHITE, (WIDTH//2 - 50, 250, 100, 40))
+    screen.blit(txt, (WIDTH//2 - txt.get_width()//2, 260))
+    
+    # Progress Bar at bottom
+    total = state["focus"]["duration"]
+    progress = 1.0 - (remaining / total)
+    pygame.draw.rect(screen, BLACK, (40, 300, 400, 10), 1)
+    pygame.draw.rect(screen, GREEN, (41, 301, int(398 * progress), 8))
+
 def main():
-    # Start Touch Thread
     t = threading.Thread(target=touch_thread, daemon=True)
     t.start()
-    
     clock = pygame.time.Clock()
-    
-    # Open FB0 for raw write
     fb_fd = os.open(FB_DEVICE, os.O_RDWR)
     
-    # --- STARTUP ANIMATION ---
     start_time = time.time()
     while time.time() - start_time < 2.0:
         screen.fill(TEAL)
-        # Draw face manually to overlay text
         pygame.draw.circle(screen, BLACK, (140, 120), 15)
         pygame.draw.circle(screen, BLACK, (340, 120), 15)
         pygame.draw.arc(screen, BLACK, (200, 180, 80, 40), 3.14, 6.28, 5)
-        # No Cheeks
-        
-        # Bouncing Text
-        t = (time.time() - start_time) * 8
-        offset = int(math.sin(t) * 10)
+        t_bounce = (time.time() - start_time) * 8
+        offset = int(math.sin(t_bounce) * 10)
         lbl = FONT_LARGE.render("HELLO!", False, BLACK)
         screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, 40 + offset))
-        
         try:
             os.lseek(fb_fd, 0, os.SEEK_SET)
             os.write(fb_fd, screen.get_buffer())
@@ -400,7 +508,6 @@ def main():
 
     running = True
     while running:
-        # Event Loop
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -409,52 +516,46 @@ def main():
                 state["last_touch_pos"] = (x, y)
                 state["last_interaction"] = time.time()
                 
-                # --- INTERACTION LOGIC ---
                 if state["mode"] == "FACE":
                     state["mode"] = "MENU"
-                    state["menu_stack"] = ["MAIN"] # Reset to main menu
+                    state["menu_stack"] = ["MAIN"]
                 
                 elif state["mode"] == "MENU":
-                    # Handle Menu Clicks
                     current_menu_id = state["menu_stack"][-1]
                     items = MENUS.get(current_menu_id, MENUS["MAIN"])
-                    
-                    # Y starts 60, height 40, margin 5 -> step 45
                     clicked_idx = (y - 60) // 45
                     
                     if 0 <= clicked_idx < len(items):
                         action = items[int(clicked_idx)]["action"]
-                        
                         if action == "BACK":
                             state["menu_stack"].pop()
-                            if not state["menu_stack"]: # Empty? Back to face
-                                state["mode"] = "FACE"
-                                
+                            if not state["menu_stack"]: state["mode"] = "FACE"
                         elif action.startswith("MENU:"):
-                            new_menu = action.split(":")[1]
-                            state["menu_stack"].append(new_menu)
-                            
+                            state["menu_stack"].append(action.split(":")[1])
                         elif action.startswith("MODE:"):
-                            new_mode = action.split(":")[1]
-                            state["mode"] = new_mode
-                            if new_mode == "NOTES":
-                                state["love_note"] = random.choice(LOVE_NOTES)
-                                
+                            state["mode"] = action.split(":")[1]
+                            if state["mode"] == "NOTES": state["love_note"] = random.choice(LOVE_NOTES)
                         elif action.startswith("SLIDESHOW:"):
-                            subdir = action.split(":")[1]
-                            start_slideshow(subdir)
-                            
+                            start_slideshow(action.split(":")[1])
                         elif action.startswith("TEXT:"):
-                            subdir = action.split(":")[1]
-                            start_text_viewer(subdir)
+                            start_text_viewer(action.split(":")[1])
+                        elif action.startswith("FOCUS:"):
+                            mins = int(action.split(":")[1])
+                            start_focus_timer(mins)
+                
+                elif state["mode"] == "FOCUS":
+                    # If active, ignore touches? Or allow double tap to cancel?
+                    # For now: Any touch returns to menu (CANCEL)
+                    # But if Timer Ended: Return to Face
+                    remaining = state["focus"]["end_time"] - time.time()
+                    if remaining <= 0:
+                        state["mode"] = "FACE"
+                    else:
+                        # Cancel Timer?
+                        state["mode"] = "MENU" # Or ask confirmation?
                 
                 else: 
-                    # In any Sub-Mode (STATS, SLIDESHOW...), click returns to MENU
                     state["mode"] = "MENU"
-                    # Keep current menu stack or reset?
-                    # Usually better to return to where we were.
-                    # But if we were deeply nested (Photos->Perso), maybe return to PHOTOS menu?
-                    # Yes, keep menu stack.
         
         # --- UPDATE & DRAW ---
         if state["mode"] == "SLIDESHOW":
@@ -462,6 +563,8 @@ def main():
             draw_slideshow(screen)
         elif state["mode"] == "TEXT_VIEWER":
             draw_text_viewer(screen)
+        elif state["mode"] == "FOCUS":
+            draw_focus_face(screen) # New Draw Function
         elif state["mode"] == "FACE": draw_face(screen)
         elif state["mode"] == "MENU": draw_menu(screen)
         elif state["mode"] == "STATS": draw_stats(screen)
@@ -477,13 +580,10 @@ def main():
             pygame.draw.line(screen, BLACK, (tx-10, ty), (tx+10, ty), 1)
             pygame.draw.line(screen, BLACK, (tx, ty-10), (tx, ty+10), 1)
         
-        # Blit to Framebuffer
         try:
             os.lseek(fb_fd, 0, os.SEEK_SET)
             os.write(fb_fd, screen.get_buffer())
-        except Exception as e:
-            pass # print(f"FB Write Error: {e}")
-            
+        except Exception as e: pass
         clock.tick(30)
     
     os.close(fb_fd)
