@@ -121,7 +121,8 @@ state = {
         "images": [],
         "index": 0,
         "last_switch": 0,
-        "current_surface": None
+        "current_surface": None,
+        "last_touch_time": 0
     },
     "text_viewer": {
         "content": [],
@@ -142,7 +143,8 @@ state = {
         "frame_index": 0,
         "last_frame_time": 0,
         "frame_duration": 0.1,
-        "gif_switch_time": 0
+        "gif_switch_time": 0,
+        "last_touch_time": 0
     }
 }
 
@@ -260,11 +262,12 @@ def draw_slideshow(screen):
         y = (HEIGHT - surf.get_height()) // 2
         screen.blit(surf, (x, y))
     
-    # Navigation hints
-    hint_left = FONT_SMALL.render("<", False, WHITE)
-    hint_right = FONT_SMALL.render(">", False, WHITE)
-    screen.blit(hint_left, (10, HEIGHT - 30))
-    screen.blit(hint_right, (WIDTH - 30, HEIGHT - 30))
+    # Navigation hints (show for 1 second after touch)
+    if time.time() - state["slideshow"]["last_touch_time"] < 1.0:
+        hint_left = FONT_SMALL.render("<", False, WHITE)
+        hint_right = FONT_SMALL.render(">", False, WHITE)
+        screen.blit(hint_left, (10, HEIGHT - 30))
+        screen.blit(hint_right, (WIDTH - 30, HEIGHT - 30))
 
 # --- GIF PLAYER FUNCTIONS ---
 def start_gif_player(subdir):
@@ -342,8 +345,8 @@ def load_next_gif():
 
 def update_gif():
     """Update GIF animation"""
-    # Check if time to switch to next GIF (every 30 seconds)
-    if time.time() - state["gif_player"]["gif_switch_time"] > 30.0:
+    # Check if time to switch to next GIF (every 15 seconds)
+    if time.time() - state["gif_player"]["gif_switch_time"] > 15.0:
         gifs = state["gif_player"]["gifs"]
         state["gif_player"]["current_gif_index"] = (state["gif_player"]["current_gif_index"] + 1) % len(gifs)
         state["gif_player"]["gif_switch_time"] = time.time()
@@ -370,11 +373,12 @@ def draw_gif(screen):
     y = (HEIGHT - frame.get_height()) // 2
     screen.blit(frame, (x, y))
     
-    # Navigation hints
-    hint_left = FONT_SMALL.render("<", False, WHITE)
-    hint_right = FONT_SMALL.render(">", False, WHITE)
-    screen.blit(hint_left, (10, HEIGHT - 30))
-    screen.blit(hint_right, (WIDTH - 30, HEIGHT - 30))
+    # Navigation hints (show for 1 second after touch)
+    if time.time() - state["gif_player"]["last_touch_time"] < 1.0:
+        hint_left = FONT_SMALL.render("<", False, WHITE)
+        hint_right = FONT_SMALL.render(">", False, WHITE)
+        screen.blit(hint_left, (10, HEIGHT - 30))
+        screen.blit(hint_right, (WIDTH - 30, HEIGHT - 30))
 
 # --- TEXT VIEWER FUNCTIONS ---
 def start_text_viewer(subdir):
@@ -782,6 +786,12 @@ def main():
                 
                 elif state["mode"] in ["SLIDESHOW", "GIF_PLAYER", "TEXT_VIEWER"]:
                     # Touch navigation: Left = Previous, Center = Exit, Right = Next
+                    # Update touch time to show arrows
+                    if state["mode"] == "SLIDESHOW":
+                        state["slideshow"]["last_touch_time"] = time.time()
+                    elif state["mode"] == "GIF_PLAYER":
+                        state["gif_player"]["last_touch_time"] = time.time()
+                    
                     if x < WIDTH / 3:
                         # LEFT: Previous
                         if state["mode"] == "SLIDESHOW":
