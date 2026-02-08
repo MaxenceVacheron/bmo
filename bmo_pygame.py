@@ -242,6 +242,10 @@ state = {
     "cached_dim_surf": None,
     "last_brightness": -1.0,
     "tap_times": [], # For 5-tap shortcut
+    "weather": {
+        "temp": "--",
+        "city": "Unknown",
+        "desc": "Loading...",
         "icon": "cloud",
         "last_update": 0
     },
