@@ -9,6 +9,8 @@ import math
 from evdev import InputDevice, ecodes
 from PIL import Image
 import json
+import shutil
+import subprocess
 from games.snake import SnakeGame
 
 # --- CONFIGURATION ---
@@ -98,6 +100,7 @@ MENUS = {
         {"label": "GAMES", "action": "MENU:GAMES", "color": YELLOW},
         {"label": "STATS", "action": "MODE:STATS", "color": YELLOW},
         {"label": "CLOCK", "action": "MODE:CLOCK", "color": BLUE},
+        {"label": "SYSTEM", "action": "MODE:ADVANCED_STATS", "color": GRAY},
         {"label": "NOTES", "action": "MODE:NOTES", "color": RED},
         {"label": "HEART", "action": "MODE:HEART", "color": PINK},
         {"label": "SETTINGS", "action": "MENU:SETTINGS", "color": GRAY},
@@ -254,6 +257,77 @@ def get_ram_usage():
             avail = int(lines[2].split()[1])
             return ((total - avail) / total) * 100
     except: return 0
+
+def get_ip_address():
+    """Get the IP address of the device"""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except:
+        return "Not Connected"
+
+def get_disk_usage():
+    """Get disk usage percentage"""
+    try:
+        total, used, free = shutil.disk_usage("/")
+        return (used / total) * 100, free / (1024**3) # Percent, Free GB
+    except:
+        return 0, 0
+
+def get_wifi_strength():
+    """Get Wi-Fi signal strength (percentage)"""
+    try:
+        res = subprocess.check_output(['iwconfig', 'wlan0']).decode('utf-8')
+        for line in res.split('\n'):
+            if "Link Quality" in line:
+                part = line.split("Link Quality=")[1].split()[0]
+                q, t = map(int, part.split('/'))
+                return (q / t) * 100
+    except:
+        pass
+    return 0
+
+def draw_advanced_stats(screen):
+    screen.fill(GRAY)
+    
+    title = FONT_MEDIUM.render("BMO SYSTEM STATUS", False, WHITE)
+    pygame.draw.rect(screen, BLACK, (0, 0, WIDTH, 50))
+    screen.blit(title, (WIDTH//2 - title.get_width()//2, 10))
+    
+    y = 70
+    ip = get_ip_address()
+    lbl = FONT_SMALL.render(f"IP: {ip}", False, BLACK)
+    screen.blit(lbl, (40, y))
+    
+    y += 40
+    wifi = get_wifi_strength()
+    lbl = FONT_SMALL.render(f"WIFI SIGNAL: {wifi:.0f}%", False, BLACK)
+    screen.blit(lbl, (40, y))
+    pygame.draw.rect(screen, BLACK, (40, y+30, 400, 20), 2)
+    w = int(396 * (wifi / 100.0))
+    if wifi > 0:
+        color = GREEN if wifi > 50 else YELLOW
+        pygame.draw.rect(screen, color, (42, y+32, w, 16))
+    
+    y += 70
+    temp = get_cpu_temp()
+    lbl = FONT_SMALL.render(f"CPU TEMP: {temp:.1f}C", False, BLACK)
+    screen.blit(lbl, (40, y))
+    pygame.draw.rect(screen, BLACK, (40, y+30, 400, 20), 2)
+    w = int(396 * (min(temp, 85) / 85.0))
+    color = RED if temp > 65 else GREEN
+    pygame.draw.rect(screen, color, (42, y+32, w, 16))
+    
+    y += 70
+    disk_p, disk_f = get_disk_usage()
+    lbl = FONT_SMALL.render(f"DISK: {disk_p:.1f}% ({disk_f:.1f} GB Free)", False, BLACK)
+    screen.blit(lbl, (40, y))
+    pygame.draw.rect(screen, BLACK, (40, y+30, 400, 20), 2)
+    w = int(396 * (disk_p / 100.0))
+    pygame.draw.rect(screen, BLUE, (42, y+32, w, 16))
 
 # --- TOUCH INPUT THREAD ---
 def touch_thread():
@@ -1287,6 +1361,8 @@ def main():
                 draw_focus_face(screen)
             elif state["mode"] == "FACE": 
                 draw_face(screen)
+            elif state["mode"] == "ADVANCED_STATS":
+                draw_advanced_stats(screen)
             elif state["mode"] == "MENU": draw_menu(screen)
             elif state["mode"] == "STATS": draw_stats(screen)
             elif state["mode"] == "CLOCK": draw_clock(screen)
