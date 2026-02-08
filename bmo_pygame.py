@@ -750,9 +750,7 @@ def update_face():
             sys.stdout.flush()
 
 def draw_face(screen):
-    # Always clear with a solid background first to avoid "ghosting" or leftover crosshairs
-    screen.fill(BLACK) 
-
+    # No need to fill with BLACK if we are blitting a full-screen image
     if state["is_blinking"]:
         target_surf = state["current_face_closed"]
     else:
@@ -761,7 +759,7 @@ def draw_face(screen):
     if target_surf:
         screen.blit(target_surf, (0, 0))
     else:
-        # Emergency Fallback
+        # Emergency Fallback - only clear here
         screen.fill(TEAL)
         pygame.draw.circle(screen, BLACK, (140, 120), 9)
         pygame.draw.circle(screen, BLACK, (340, 120), 9)
@@ -1123,78 +1121,77 @@ def main():
                 else: 
                     state["mode"] = "MENU"
         
-        # --- INACTIVITY CHECK ---
-        # Return to FACE after 20s of inactivity, unless in a "focus" mode
+        # --- UPDATE PHASE ---
+        now = time.time()
+        always_update = state["mode"] in ["SNAKE", "GIF_PLAYER", "STARTUP", "SLIDESHOW", "CLOCK"]
+        
+        # Inactivity Check
         if state["mode"] in ["MENU", "STATS", "CLOCK", "NOTES", "HEART", "SETTINGS", "GAMES"]:
-            if time.time() - state["last_interaction"] > 20:
+            if now - state["last_interaction"] > 20:
                 print("Inactivity timeout: Returning to FACE")
                 switch_to_face_mode()
-
-        # --- POP-UP FACE CHECK ---
-        now = time.time()
+        
+        # Pop-up Check
         if not state["is_showing_pop_face"] and state["mode"] not in ["FACE", "SNAKE", "STARTUP"]:
             if now > state["pop_face_timer"]:
                 state["is_showing_pop_face"] = True
                 state["pop_face_end_time"] = now + 5.0
                 state["needs_redraw"] = True
-                load_random_face() # New face for the pop-up!
-        
-        # --- UPDATE & DRAW ---
-        if state["is_showing_pop_face"]:
+                load_random_face()
+
+        # State updates
+        if state["is_showing_pop_face"] or state["mode"] == "FACE":
             update_face()
-            draw_face(screen)
-            if now > state["pop_face_end_time"]:
-                state["is_showing_pop_face"] = False
-                state["pop_face_timer"] = now + random.uniform(50, 70)
-                state["needs_redraw"] = True
         elif state["mode"] == "STARTUP":
             update_startup()
-            draw_startup(screen)
         elif state["mode"] == "SLIDESHOW":
             update_slideshow()
-            draw_slideshow(screen)
         elif state["mode"] == "GIF_PLAYER":
             update_gif()
-            draw_gif(screen)
-        elif state["mode"] == "TEXT_VIEWER":
-            draw_text_viewer(screen)
-        elif state["mode"] == "FOCUS":
-            draw_focus_face(screen) # New Draw Function
-        elif state["mode"] == "FACE": 
-            update_face()
-            draw_face(screen)
-        elif state["mode"] == "MENU": draw_menu(screen)
-        elif state["mode"] == "STATS": draw_stats(screen)
-        elif state["mode"] == "CLOCK": draw_clock(screen)
-        elif state["mode"] == "NOTES": draw_notes(screen)
-        elif state["mode"] == "HEART": draw_heart(screen)
         elif state["mode"] == "SNAKE":
             if state["snake"] is None:
                 state["snake"] = SnakeGame(WIDTH, HEIGHT)
             state["snake"].update()
-            state["snake"].draw(screen)
         
-        # Crosshair Debug (Removed to prevent face tint issues)
-        # if "last_touch_pos" in state and "last_touch_pos_time" in state:
-        #     if time.time() - state["last_touch_pos_time"] < 1.0:
-        #         ...
-        pass
-        
-        # Apply Software Brightness
-        if state["brightness"] < 1.0:
-            if state["cached_dim_surf"] is None or state["last_brightness"] != state["brightness"]:
-                dim_val = int(state["brightness"] * 255)
-                # Create dim surf with IDENTICAL format to avoid tint shifts
-                state["cached_dim_surf"] = pygame.Surface((WIDTH, HEIGHT), depth=16, masks=screen.get_masks())
-                state["cached_dim_surf"].fill((dim_val, dim_val, dim_val))
-                state["last_brightness"] = state["brightness"]
-                state["needs_redraw"] = True
-            screen.blit(state["cached_dim_surf"], (0, 0), special_flags=pygame.BLEND_MULT)
-        
-        # --- FRAMEBUFFER WRITE ---
-        # Only write if something changed or we are in a mode that needs constant updates (Snake, GIF, Startup)
-        always_update = state["mode"] in ["SNAKE", "GIF_PLAYER", "STARTUP", "SLIDESHOW", "CLOCK"]
+        # --- DRAW & WRITE PHASE (Strictly lazy) ---
         if state["needs_redraw"] or always_update:
+            # 1. Background / Core Mode Drawing
+            if state["is_showing_pop_face"]:
+                draw_face(screen)
+                if now > state["pop_face_end_time"]:
+                    state["is_showing_pop_face"] = False
+                    state["pop_face_timer"] = now + random.uniform(50, 70)
+                    state["needs_redraw"] = True
+            elif state["mode"] == "STARTUP":
+                draw_startup(screen)
+            elif state["mode"] == "SLIDESHOW":
+                draw_slideshow(screen)
+            elif state["mode"] == "GIF_PLAYER":
+                draw_gif(screen)
+            elif state["mode"] == "TEXT_VIEWER":
+                draw_text_viewer(screen)
+            elif state["mode"] == "FOCUS":
+                draw_focus_face(screen)
+            elif state["mode"] == "FACE": 
+                draw_face(screen)
+            elif state["mode"] == "MENU": draw_menu(screen)
+            elif state["mode"] == "STATS": draw_stats(screen)
+            elif state["mode"] == "CLOCK": draw_clock(screen)
+            elif state["mode"] == "NOTES": draw_notes(screen)
+            elif state["mode"] == "HEART": draw_heart(screen)
+            elif state["mode"] == "SNAKE":
+                state["snake"].draw(screen)
+
+            # 2. Dimming (Apply directly before write)
+            if state["brightness"] < 1.0:
+                if state["cached_dim_surf"] is None or state["last_brightness"] != state["brightness"]:
+                    dim_val = int(state["brightness"] * 255)
+                    state["cached_dim_surf"] = pygame.Surface((WIDTH, HEIGHT), depth=16, masks=screen.get_masks())
+                    state["cached_dim_surf"].fill((dim_val, dim_val, dim_val))
+                    state["last_brightness"] = state["brightness"]
+                screen.blit(state["cached_dim_surf"], (0, 0), special_flags=pygame.BLEND_MULT)
+
+            # 3. Framebuffer Write (Contiguous)
             try:
                 os.lseek(fb_fd, 0, os.SEEK_SET)
                 os.write(fb_fd, screen.get_buffer())
@@ -1205,11 +1202,6 @@ def main():
                 sys.exit(1)
             
         clock.tick(30)
-        
-        # Heartbeat every 3 seconds (at 30fps)
-        if frame_count % 90 == 0:
-            print(f"BMO Heartbeat - Mode: {state['mode']}")
-            sys.stdout.flush()
         frame_count += 1
     
     os.close(fb_fd)
