@@ -144,7 +144,9 @@ state = {
         "last_frame_time": 0,
         "frame_duration": 0.1,
         "gif_switch_time": 0,
-        "last_touch_time": 0
+        "last_touch_time": 0,
+        "next_frames": [],  # Preloaded next GIF
+        "next_frame_duration": 0.1
     }
 }
 
@@ -295,15 +297,10 @@ def start_gif_player(subdir):
     load_next_gif()
     state["mode"] = "GIF_PLAYER"
 
-def load_next_gif():
-    """Load all frames from current GIF"""
-    gifs = state["gif_player"]["gifs"]
-    if not gifs:
-        return
-    
-    gif_path = gifs[state["gif_player"]["current_gif_index"]]
-    state["gif_player"]["frames"] = []
-    state["gif_player"]["frame_index"] = 0
+def _load_gif_frames(gif_path):
+    """Helper function to load GIF frames and duration"""
+    frames = []
+    duration = 0.1
     
     try:
         pil_gif = Image.open(gif_path)
@@ -313,7 +310,6 @@ def load_next_gif():
             duration = pil_gif.info.get('duration', 100) / 1000.0
         except:
             duration = 0.1
-        state["gif_player"]["frame_duration"] = duration
         
         # Extract all frames
         frame_num = 0
@@ -334,14 +330,54 @@ def load_next_gif():
                 data = frame.tobytes()
                 pygame_frame = pygame.image.fromstring(data, size, mode)
                 
-                state["gif_player"]["frames"].append(pygame_frame)
+                frames.append(pygame_frame)
                 frame_num += 1
             except EOFError:
                 break
         
-        print(f"Loaded GIF with {len(state['gif_player']['frames'])} frames")
+        print(f"Loaded GIF with {len(frames)} frames")
     except Exception as e:
         print(f"Error loading GIF: {e}")
+    
+    return frames, duration
+
+def load_next_gif():
+    """Load all frames from current GIF (use preloaded if available)"""
+    gifs = state["gif_player"]["gifs"]
+    if not gifs:
+        return
+    
+    # Use preloaded frames if available
+    if state["gif_player"]["next_frames"]:
+        state["gif_player"]["frames"] = state["gif_player"]["next_frames"]
+        state["gif_player"]["frame_duration"] = state["gif_player"]["next_frame_duration"]
+        state["gif_player"]["frame_index"] = 0
+        state["gif_player"]["next_frames"] = []
+        print("Using preloaded GIF")
+    else:
+        # Load current GIF
+        gif_path = gifs[state["gif_player"]["current_gif_index"]]
+        frames, duration = _load_gif_frames(gif_path)
+        state["gif_player"]["frames"] = frames
+        state["gif_player"]["frame_duration"] = duration
+        state["gif_player"]["frame_index"] = 0
+    
+    # Preload next GIF
+    preload_next_gif()
+
+def preload_next_gif():
+    """Preload the next GIF in background"""
+    gifs = state["gif_player"]["gifs"]
+    if not gifs or len(gifs) <= 1:
+        return
+    
+    next_index = (state["gif_player"]["current_gif_index"] + 1) % len(gifs)
+    next_gif_path = gifs[next_index]
+    
+    frames, duration = _load_gif_frames(next_gif_path)
+    state["gif_player"]["next_frames"] = frames
+    state["gif_player"]["next_frame_duration"] = duration
+    print(f"Preloaded next GIF (index {next_index})")
 
 def update_gif():
     """Update GIF animation"""
@@ -711,6 +747,7 @@ def main():
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = event.pos
                 state["last_touch_pos"] = (x, y)
+                state["last_touch_pos_time"] = time.time()
                 state["last_interaction"] = time.time()
                 
                 if state["mode"] == "FACE":
@@ -843,13 +880,14 @@ def main():
         elif state["mode"] == "NOTES": draw_notes(screen)
         elif state["mode"] == "HEART": draw_heart(screen)
         
-        # Crosshair Debug
-        if "last_touch_pos" in state:
-            tx, ty = state["last_touch_pos"]
-            pygame.draw.line(screen, WHITE, (tx-10, ty), (tx+10, ty), 3)
-            pygame.draw.line(screen, WHITE, (tx, ty-10), (tx, ty+10), 3)
-            pygame.draw.line(screen, BLACK, (tx-10, ty), (tx+10, ty), 1)
-            pygame.draw.line(screen, BLACK, (tx, ty-10), (tx, ty+10), 1)
+        # Crosshair Debug (show for 1 second after touch)
+        if "last_touch_pos" in state and "last_touch_pos_time" in state:
+            if time.time() - state["last_touch_pos_time"] < 1.0:
+                tx, ty = state["last_touch_pos"]
+                pygame.draw.line(screen, WHITE, (tx-10, ty), (tx+10, ty), 3)
+                pygame.draw.line(screen, WHITE, (tx, ty-10), (tx, ty+10), 3)
+                pygame.draw.line(screen, BLACK, (tx-10, ty), (tx+10, ty), 1)
+                pygame.draw.line(screen, BLACK, (tx, ty-10), (tx, ty+10), 1)
         
         try:
             os.lseek(fb_fd, 0, os.SEEK_SET)
