@@ -32,6 +32,7 @@ YELLOW = (241, 196, 15)
 RED = (231, 76, 60)
 BLUE = (52, 152, 219)
 GREEN = (46, 204, 113)
+GREEN_MOUTH = (39, 174, 96) # For the big smile
 GRAY = (127, 140, 141)
 
 # Fonts
@@ -138,6 +139,9 @@ state = {
     "middle_finger_timer": 0,
     "show_middle_finger": False,
     "middle_finger_end_time": 0,
+    "big_smile_timer": 0,
+    "show_big_smile": False,
+    "big_smile_end_time": 0,
     "startup": {
         "message": "Hello Agnès! I'm BMO. Maxence built my brain just for you.",
         "char_index": 0,
@@ -643,6 +647,20 @@ def update_face():
                 state["show_middle_finger"] = True
                 state["middle_finger_end_time"] = now + 2.0  # Show for 2 seconds
             state["middle_finger_timer"] = now + random.uniform(5.0, 10.0)
+    
+    # Big smile (occasional)
+    if state["show_big_smile"]:
+        if now > state["big_smile_end_time"]:
+            state["show_big_smile"] = False
+            state["big_smile_timer"] = now + random.uniform(8.0, 15.0)
+    else:
+        if state["big_smile_timer"] == 0:
+            state["big_smile_timer"] = now + random.uniform(8.0, 15.0)
+        elif now > state["big_smile_timer"]:
+            if random.random() < 0.15: # 15% chance
+                state["show_big_smile"] = True
+                state["big_smile_end_time"] = now + 3.0
+            state["big_smile_timer"] = now + random.uniform(8.0, 15.0)
 
 def draw_face(screen):
     screen.fill(TEAL)
@@ -656,7 +674,16 @@ def draw_face(screen):
         pygame.draw.circle(screen, BLACK, (140, 120), 9)
         pygame.draw.circle(screen, BLACK, (340, 120), 9)
     
-    if state["expression"] == "happy":
+    if state["show_big_smile"]:
+        # Draw the big open mouth from the sticker
+        mouth_rect = pygame.Rect(200, 155, 80, 50)
+        # Black background/outline
+        pygame.draw.ellipse(screen, BLACK, mouth_rect)
+        # Green tongue part
+        pygame.draw.ellipse(screen, GREEN_MOUTH, (205, 175, 70, 25))
+        # White top part
+        pygame.draw.ellipse(screen, WHITE, (205, 158, 70, 25))
+    elif state["expression"] == "happy":
         # Smaller, cuter smile centered like the figurine
         pygame.draw.arc(screen, BLACK, (210, 140, 60, 40), 3.14, 6.28, 4)
     
