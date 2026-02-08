@@ -8,13 +8,40 @@ import threading
 import math
 from evdev import InputDevice, ecodes
 from PIL import Image
+import json
 from games.snake import SnakeGame
 
 # --- CONFIGURATION ---
 WIDTH, HEIGHT = 480, 320
-FB_DEVICE = "/dev/fb0"
-TOUCH_DEVICE = "/dev/input/event6" # Ensure this matches detected device
+FB_DEVICE = "/dev/fb1"
+TOUCH_DEVICE = "/dev/input/event4" # SPI-connected touch panel on CS1
 NEXTCLOUD_PATH = "/home/pi/mnt/nextcloud/shr/BMO_Agnes"
+CONFIG_FILE = "/home/pi/bmo/bmo_config.json"
+FACE_DIR = "/home/pi/bmo/bmo_faces"
+
+def load_config():
+    """Load configuration from file"""
+    defaults = {"brightness": 1.0, "default_mode": "FACE"}
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+                return {**defaults, **config}
+        except:
+            return defaults
+    return defaults
+
+def save_config():
+    """Save configuration to file"""
+    config = {
+        "brightness": state.get("brightness", 1.0),
+        "default_mode": state.get("default_mode", "FACE")
+    }
+    try:
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(config, f)
+    except Exception as e:
+        print(f"Error saving config: {e}")
 
 # Initialize Pygame Headless
 os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -83,6 +110,14 @@ MENUS = {
         {"label": "BRIGHTNESS: 50%", "action": "BRIGHTNESS:0.50", "color": TEAL},
         {"label": "BRIGHTNESS: 75%", "action": "BRIGHTNESS:0.75", "color": TEAL},
         {"label": "BRIGHTNESS: 100%", "action": "BRIGHTNESS:1.0", "color": TEAL},
+        {"label": "BOOT MODE", "action": "MENU:DEFAULT_MODE", "color": BLUE},
+        {"label": "< BACK", "action": "BACK", "color": GRAY},
+    ],
+    "DEFAULT_MODE": [
+        {"label": "FACE (Default)", "action": "SET_DEFAULT:FACE", "color": TEAL},
+        {"label": "CLOCK", "action": "SET_DEFAULT:CLOCK", "color": BLUE},
+        {"label": "STATS", "action": "SET_DEFAULT:STATS", "color": YELLOW},
+        {"label": "HEART", "action": "SET_DEFAULT:HEART", "color": PINK},
         {"label": "< BACK", "action": "BACK", "color": GRAY},
     ],
     "FOCUS": [
@@ -128,20 +163,21 @@ MENUS = {
 state = {
     "mode": "STARTUP", # Back to startup for Agnès
     "expression": "happy",
-    "last_interaction": 0,
+    "last_interaction": time.time(),
     "love_note": "You are amazing!",
     "menu_stack": ["MAIN"],
     "menu_page": 0,
-    "brightness": 1.0, # 1.0 = Max, 0.0 = Black
+    "brightness": 1.0,
+    "default_mode": "FACE",
     "blink_timer": 0, # Time until next blink
     "is_blinking": False,
     "blink_end_time": 0,
-    "middle_finger_timer": 0,
-    "show_middle_finger": False,
-    "middle_finger_end_time": 0,
-    "big_smile_timer": 0,
-    "show_big_smile": False,
-    "big_smile_end_time": 0,
+    "pop_face_timer": time.time() + 60,
+    "is_showing_pop_face": False,
+    "pop_face_end_time": 0,
+    "face_images": [],
+    "current_face_surface": None,
+    "last_face_switch": 0,
     "startup": {
         "message": "Hello Agnès! I'm BMO. Maxence built my brain just for you.",
         "char_index": 0,
@@ -180,7 +216,9 @@ state = {
         "next_frames": [],  # Preloaded next GIF
         "next_frame_duration": 0.1
     },
-    "snake": None  # Will hold SnakeGame instance
+    "snake": None, # Will hold SnakeGame instance
+    "cached_dim_surf": None,
+    "last_brightness": -1.0
 }
 
 # --- SYSTEM STATS ---
@@ -502,14 +540,15 @@ def update_startup():
     target_chars = int(elapsed / state["startup"]["char_delay"])
     
     if target_chars > len(state["startup"]["message"]):
-        # Animation complete, wait 2 seconds then go to FACE
+        # Animation complete, wait 2 seconds then go to default mode
         if elapsed > len(state["startup"]["message"]) * state["startup"]["char_delay"] + 2.0:
-            print("Startup complete, moving to FACE")
-            state["mode"] = "FACE"
+            print(f"Startup complete, moving to {state['default_mode']}")
+            state["mode"] = state["default_mode"]
     else:
         if target_chars != state["startup"]["char_index"]:
             state["startup"]["char_index"] = target_chars
             print(f"Startup progress: {state['startup']['char_index']}/{len(state['startup']['message'])}")
+            sys.stdout.flush()
 
 def draw_startup(screen):
     screen.fill(BLACK) # Using BLACK for startup contrast
@@ -548,6 +587,33 @@ def draw_startup(screen):
             cursor_x = WIDTH//2 - last_line_surf.get_width()//2 + last_line_surf.get_width()
             cursor_y = y - 30
             screen.blit(cursor, (cursor_x, cursor_y))
+
+# --- FACE IMAGE MANAGEMENT ---
+def load_random_face():
+    """Load a random face from the bmo_faces directory"""
+    if not state["face_images"]:
+        if os.path.exists(FACE_DIR):
+            state["face_images"] = [os.path.join(FACE_DIR, f) for f in os.listdir(FACE_DIR) 
+                                   if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+    
+    if state["face_images"]:
+        try:
+            face_path = random.choice(state["face_images"])
+            img = Image.open(face_path).convert('RGB')
+            img = img.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
+            
+            # Convert to Pygame
+            data = img.tobytes()
+            pygame_img = pygame.image.fromstring(data, img.size, img.mode)
+            
+            # Convert to screen format
+            converted = pygame.Surface((WIDTH, HEIGHT), depth=16, masks=(0xF800, 0x07E0, 0x001F, 0))
+            converted.blit(pygame_img, (0, 0))
+            
+            state["current_face_surface"] = converted
+            state["last_face_switch"] = time.time()
+        except Exception as e:
+            print(f"Error loading face image: {e}")
 
 # --- FOCUS MODE FUNCTIONS ---
 def start_focus_timer(minutes):
@@ -620,8 +686,12 @@ def draw_focus_face(screen):
 
 # --- COMMON DRAWING ---
 def update_face():
-    """Update BMO's face state (blinking and occasional middle finger)"""
+    """Update BMO's face state (blinking and image rotation)"""
     now = time.time()
+    
+    # Rotate face every 2 minutes
+    if now - state["last_face_switch"] > 120:
+        load_random_face()
     
     # Blinking logic
     if state["is_blinking"]:
@@ -632,67 +702,21 @@ def update_face():
         if now > state["blink_timer"]:
             state["is_blinking"] = True
             state["blink_end_time"] = now + 0.15 # Blink duration
-    
-    # Middle finger easter egg (rare)
-    if state["show_middle_finger"]:
-        if now > state["middle_finger_end_time"]:
-            state["show_middle_finger"] = False
-            state["middle_finger_timer"] = now + random.uniform(5.0, 10.0)
-    else:
-        if state["middle_finger_timer"] == 0:
-            state["middle_finger_timer"] = now + random.uniform(5.0, 10.0)
-        elif now > state["middle_finger_timer"]:
-            # 80% chance to show middle finger
-            if random.random() < 0.8:
-                state["show_middle_finger"] = True
-                state["middle_finger_end_time"] = now + 2.0  # Show for 2 seconds
-            state["middle_finger_timer"] = now + random.uniform(5.0, 10.0)
-    
-    # Big smile (occasional)
-    if state["show_big_smile"]:
-        if now > state["big_smile_end_time"]:
-            state["show_big_smile"] = False
-            state["big_smile_timer"] = now + random.uniform(8.0, 15.0)
-    else:
-        if state["big_smile_timer"] == 0:
-            state["big_smile_timer"] = now + random.uniform(8.0, 15.0)
-        elif now > state["big_smile_timer"]:
-            if random.random() < 0.15: # 15% chance
-                state["show_big_smile"] = True
-                state["big_smile_end_time"] = now + 3.0
-            state["big_smile_timer"] = now + random.uniform(8.0, 15.0)
 
 def draw_face(screen):
-    screen.fill(TEAL)
-    
-    if state["is_blinking"]:
-        # Draw closed eyes
-        pygame.draw.line(screen, BLACK, (130, 120), (150, 120), 5)
-        pygame.draw.line(screen, BLACK, (330, 120), (350, 120), 5)
+    if state["current_face_surface"]:
+        screen.blit(state["current_face_surface"], (0, 0))
     else:
-        # Draw open eyes (smaller dots like the photo)
+        screen.fill(TEAL)
+        # Fallback if image failed
         pygame.draw.circle(screen, BLACK, (140, 120), 9)
         pygame.draw.circle(screen, BLACK, (340, 120), 9)
-    
-    if state["show_big_smile"]:
-        # Draw the big open mouth from the sticker
-        mouth_rect = pygame.Rect(200, 155, 80, 50)
-        # Black background/outline
-        pygame.draw.ellipse(screen, BLACK, mouth_rect)
-        # Green tongue part
-        pygame.draw.ellipse(screen, GREEN_MOUTH, (205, 175, 70, 25))
-        # White top part
-        pygame.draw.ellipse(screen, WHITE, (205, 158, 70, 25))
-    elif state["expression"] == "happy":
-        # Smaller, cuter smile centered like the figurine
         pygame.draw.arc(screen, BLACK, (210, 140, 60, 40), 3.14, 6.28, 4)
     
-    # Easter egg: middle finger
-    if state["show_middle_finger"]:
-        # Draw hand/fist at bottom center
-        pygame.draw.rect(screen, BLACK, (220, 240, 40, 30))  # Palm
-        # Draw middle finger extended upward
-        pygame.draw.rect(screen, BLACK, (232, 200, 16, 45))  # Finger
+    if state["is_blinking"]:
+        # Digital blink overlay (works on any image)
+        pygame.draw.line(screen, BLACK, (130, 120), (150, 120), 6)
+        pygame.draw.line(screen, BLACK, (330, 120), (350, 120), 6)
 
 def draw_menu(screen):
     screen.fill(WHITE)
@@ -883,13 +907,21 @@ def main():
         print("BMO is already running!")
         sys.exit(0)
 
+    # Load Config
+    config = load_config()
+    state["brightness"] = config.get("brightness", 1.0)
+    state["default_mode"] = config.get("default_mode", "FACE")
+
+    # Load initial face
+    load_random_face()
+
     t = threading.Thread(target=touch_thread, daemon=True)
     t.start()
     clock = pygame.time.Clock()
     fb_fd = os.open(FB_DEVICE, os.O_RDWR)
     
     start_time = time.time()
-    # Removed old splash loop
+    frame_count = 0
     running = True
     while running:
         for event in pygame.event.get():
@@ -900,6 +932,12 @@ def main():
                 state["last_touch_pos"] = (x, y)
                 state["last_touch_pos_time"] = time.time()
                 state["last_interaction"] = time.time()
+                
+                # If showing a pop-up face, any touch dismisses it
+                if state["is_showing_pop_face"]:
+                    state["is_showing_pop_face"] = False
+                    state["pop_face_timer"] = time.time() + random.uniform(50, 70)
+                    continue # Ignore this touch for the underlying mode
                 
                 if state["mode"] == "STARTUP":
                     state["mode"] = "FACE"
@@ -964,6 +1002,15 @@ def main():
                             start_focus_timer(mins)
                         elif action.startswith("BRIGHTNESS:"):
                             state["brightness"] = float(action.split(":")[1])
+                            save_config()
+                        elif action.startswith("SET_DEFAULT:"):
+                            state["default_mode"] = action.split(":")[1]
+                            save_config()
+                            # Pop back to SETTINGS menu
+                            if len(state["menu_stack"]) > 1:
+                                state["menu_stack"].pop()
+                            state["menu_page"] = 0
+                            state["mode"] = "MENU"
                 
                 elif state["mode"] == "FOCUS":
                     # If active, ignore touches? Or allow double tap to cancel?
@@ -1026,14 +1073,28 @@ def main():
                     state["mode"] = "MENU"
         
         # --- INACTIVITY CHECK ---
-        # Return to FACE after 60s of inactivity, unless in a "focus" mode
+        # Return to FACE after 20s of inactivity, unless in a "focus" mode
         if state["mode"] in ["MENU", "STATS", "CLOCK", "NOTES", "HEART", "SETTINGS", "GAMES"]:
-            if time.time() - state["last_interaction"] > 60:
+            if time.time() - state["last_interaction"] > 20:
                 print("Inactivity timeout: Returning to FACE")
                 state["mode"] = "FACE"
 
+        # --- POP-UP FACE CHECK ---
+        now = time.time()
+        if not state["is_showing_pop_face"] and state["mode"] not in ["FACE", "SNAKE", "STARTUP"]:
+            if now > state["pop_face_timer"]:
+                state["is_showing_pop_face"] = True
+                state["pop_face_end_time"] = now + 5.0
+                load_random_face() # New face for the pop-up!
+        
         # --- UPDATE & DRAW ---
-        if state["mode"] == "STARTUP":
+        if state["is_showing_pop_face"]:
+            update_face()
+            draw_face(screen)
+            if now > state["pop_face_end_time"]:
+                state["is_showing_pop_face"] = False
+                state["pop_face_timer"] = now + random.uniform(50, 70)
+        elif state["mode"] == "STARTUP":
             update_startup()
             draw_startup(screen)
         elif state["mode"] == "SLIDESHOW":
@@ -1071,7 +1132,6 @@ def main():
         
         # Apply Software Brightness
         if state["brightness"] < 1.0:
-            # Using BLEND_MULT preserves color ratios better than alpha blending
             dim_val = int(state["brightness"] * 255)
             dim_surf = pygame.Surface((WIDTH, HEIGHT))
             dim_surf.fill((dim_val, dim_val, dim_val))
@@ -1080,8 +1140,18 @@ def main():
         try:
             os.lseek(fb_fd, 0, os.SEEK_SET)
             os.write(fb_fd, screen.get_buffer())
-        except Exception as e: pass
+        except Exception as e:
+            print(f"Framebuffer Write Error: {e}")
+            sys.stdout.flush()
+            sys.exit(1)
+            
         clock.tick(30)
+        
+        # Heartbeat every 3 seconds (at 30fps)
+        if frame_count % 90 == 0:
+            print(f"BMO Heartbeat - Mode: {state['mode']}")
+            sys.stdout.flush()
+        frame_count += 1
     
     os.close(fb_fd)
     pygame.quit()
