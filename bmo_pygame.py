@@ -191,6 +191,10 @@ def update_slideshow():
         try:
             img_path = imgs[state["slideshow"]["index"]]
             img = pygame.image.load(img_path)
+            
+            # Convert to match screen format (RGB565 with correct masks)
+            img = img.convert(depth=16, masks=(0xF800, 0x07E0, 0x001F, 0))
+            
             img_rect = img.get_rect()
             scale = min(WIDTH / img_rect.width, HEIGHT / img_rect.height)
             new_size = (int(img_rect.width * scale), int(img_rect.height * scale))
@@ -198,6 +202,7 @@ def update_slideshow():
             state["slideshow"]["current_surface"] = img
             state["slideshow"]["index"] = (state["slideshow"]["index"] + 1) % len(imgs)
         except Exception as e:
+            print(f"Slideshow error: {e}")
             state["slideshow"]["index"] = (state["slideshow"]["index"] + 1) % len(imgs)
 
 def draw_slideshow(screen):
