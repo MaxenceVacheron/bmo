@@ -242,12 +242,16 @@ state = {
     "cached_dim_surf": None,
     "last_brightness": -1.0,
     "tap_times": [], # For 5-tap shortcut
-    "weather": {
-        "temp": "--",
-        "city": "Unknown",
-        "desc": "Loading...",
         "icon": "cloud",
         "last_update": 0
+    },
+    "needs": {
+        "hunger": 80.0,
+        "energy": 90.0,
+        "play": 70.0,
+        "last_decay": time.time(),
+        "hearts": [], # Floating hearts: {"pos": [x,y], "vel": [vx,vy], "life": t}
+        "show_interaction": False # Whether to show feeding/playing buttons
     }
 }
 
@@ -359,6 +363,17 @@ def auto_update_and_restart():
         sys.exit(0)
     except Exception as e:
         print(f"Error during update: {e}")
+
+def spawn_hearts(x, y):
+    """Create a burst of floating hearts at position"""
+    now = time.time()
+    for _ in range(5):
+        state["needs"]["hearts"].append({
+            "pos": [float(x), float(y)],
+            "vel": [random.uniform(-1.5, 1.5), random.uniform(-2, -4)],
+            "end_time": now + random.uniform(1.5, 2.5)
+        })
+    state["needs_redraw"] = True
 
 def get_weather():
     """Fetch current weather from wttr.in"""
@@ -930,11 +945,46 @@ def draw_focus_face(screen):
 
 # --- COMMON DRAWING ---
 def update_face():
-    """Update BMO's face state (blinking and image rotation)"""
+    """Update BMO's face state (blinking, image rotation, and needs)"""
     now = time.time()
     
-    # Dynamic rotation interval based on emotion
-    # Positive = 45s, Negative = 22.5s (2x shorter)
+    # --- NEEDS DECAY ---
+    # Decay every 30 seconds for performance
+    if now - state["needs"]["last_decay"] > 30:
+        elapsed_mins = (now - state["needs"]["last_decay"]) / 60.0
+        # Decay rates (per minute)
+        # Hunger: 100% in 15h -> 0.11% / min
+        # Play: 100% in 10h -> 0.16% / min
+        # Energy: 100% in 20h -> 0.08% / min
+        state["needs"]["hunger"] = max(0, state["needs"]["hunger"] - (0.11 * elapsed_mins))
+        state["needs"]["play"] = max(0, state["needs"]["play"] - (0.16 * elapsed_mins))
+        state["needs"]["energy"] = max(0, state["needs"]["energy"] - (0.08 * elapsed_mins))
+        state["needs"]["last_decay"] = now
+        
+        # Update Emotion based on needs
+        avg = (state["needs"]["hunger"] + state["needs"]["play"] + state["needs"]["energy"]) / 3.0
+        if avg < 40:
+            if state["emotion"] != "negative":
+                state["emotion"] = "negative"
+                print("BMO feels sad/neglected...")
+                load_random_face()
+        elif avg > 60:
+            if state["emotion"] != "positive":
+                state["emotion"] = "positive"
+                print("BMO feels happy and cared for!")
+                load_random_face()
+
+    # --- HEARTS ANIMATION ---
+    still_alive = []
+    for h in state["needs"]["hearts"]:
+        if now < h["end_time"]:
+            h["pos"][0] += h["vel"][0]
+            h["pos"][1] += h["vel"][1]
+            still_alive.append(h)
+            state["needs_redraw"] = True
+    state["needs"]["hearts"] = still_alive
+
+    # Dynamic rotation interval (Original logic)
     interval = 22.5 if state.get("emotion") == "negative" else 45.0
     
     if now - state["last_face_switch"] > interval:
@@ -1048,6 +1098,43 @@ def draw_face(screen):
     if state["idle"]["humming"]["is_active"] or state["idle"]["humming"]["notes"]:
         for n in state["idle"]["humming"]["notes"]:
             draw_music_note(screen, n["pos"], 1.0) # Procedural note
+
+    # 3. Needs Interaction UI (Floating buttons on face)
+    if state["needs"]["show_interaction"]:
+        # Draw semi-transparent overlay
+        overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 100))
+        screen.blit(overlay, (0,0))
+        
+        # Draw 3 buttons: FOOD, PLAY, SLEEP
+        # Icons/Colors for buttons
+        btns = [
+            ("FOOD", PINK, (80, 240, 80, 40), "hunger"),
+            ("PLAY", YELLOW, (200, 240, 80, 40), "play"),
+            ("SLEEP", BLUE, (320, 240, 80, 40), "energy")
+        ]
+        for label, color, rect, key in btns:
+            val = state["needs"][key]
+            # Draw BG
+            pygame.draw.rect(screen, color, rect, border_radius=8)
+            # Draw level bar inside
+            bar_w = int(76 * (val/100.0))
+            pygame.draw.rect(screen, WHITE, (rect[0]+2, rect[1]+30, bar_w, 6))
+            # Text
+            txt = FONT_TINY.render(label, False, WHITE)
+            screen.blit(txt, (rect[0] + (rect[2]-txt.get_width())//2, rect[1]+5))
+
+        # Close instruction
+        instr = FONT_TINY.render("Tap center to hide", False, WHITE)
+        screen.blit(instr, (WIDTH//2 - instr.get_width()//2, 290))
+
+    # 4. Floating Hearts
+    for h in state["needs"]["hearts"]:
+        # Draw a simple heart shape
+        hx, hy = h["pos"]
+        pygame.draw.circle(screen, PINK, (int(hx-4), int(hy)), 5)
+        pygame.draw.circle(screen, PINK, (int(hx+4), int(hy)), 5)
+        pygame.draw.polygon(screen, PINK, [(int(hx-9), int(hy+2)), (int(hx+9), int(hy+2)), (int(hx), int(hy+10))])
 
 def draw_menu(screen):
     screen.fill(WHITE)
@@ -1283,9 +1370,31 @@ def main():
                 if state["mode"] == "STARTUP":
                     switch_to_face_mode()
                 elif state["mode"] == "FACE":
-                    state["mode"] = "MENU"
-                    state["menu_stack"] = ["MAIN"]
-                    state["menu_page"] = 0 # Reset page when entering menu
+                    # If tapping face, toggle interaction UI
+                    if WIDTH/4 < x < 3*WIDTH/3 and HEIGHT/4 < y < 3*HEIGHT/4:
+                        state["needs"]["show_interaction"] = not state["needs"]["show_interaction"]
+                    
+                    # Handle interaction buttons if they are shown
+                    if state["needs"]["show_interaction"]:
+                        if 80 < x < 160 and 240 < y < 280: # FOOD
+                            state["needs"]["hunger"] = min(100, state["needs"]["hunger"] + 20)
+                            spawn_hearts(x, y)
+                        elif 200 < x < 280 and 240 < y < 280: # PLAY
+                            state["needs"]["play"] = min(100, state["needs"]["play"] + 25)
+                            spawn_hearts(x, y)
+                        elif 320 < x < 400 and 240 < y < 280: # SLEEP
+                            state["needs"]["energy"] = min(100, state["needs"]["energy"] + 30)
+                            spawn_hearts(x, y)
+                        else:
+                            # Tapping outside buttons while UI is up hides it
+                            state["needs"]["show_interaction"] = False
+                    else:
+                        # Normal face tap -> Menu
+                        state["mode"] = "MENU"
+                        state["menu_stack"] = ["MAIN"]
+                        state["menu_page"] = 0 # Reset page when entering menu
+                    
+                    state["needs_redraw"] = True
                 
                 elif state["mode"] == "MENU":
                     current_menu_id = state["menu_stack"][-1]
