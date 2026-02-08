@@ -45,32 +45,7 @@ except:
     FONT_SMALL = pygame.font.SysFont(None, 20)
     FONT_TINY = pygame.font.SysFont(None, 15)
 
-# State
-state = {
-    "mode": "FACE", # FACE, MENU, STATS, CLOCK, NOTES, HEART, SLIDESHOW, TEXT_VIEWER, FOCUS
-    "expression": "happy",
-    "last_interaction": 0,
-    "love_note": "You are amazing!",
-    "menu_stack": ["MAIN"], # Stack of menu identifiers
-    "slideshow": {
-        "path": "",
-        "images": [],
-        "index": 0,
-        "last_switch": 0,
-        "current_surface": None
-    },
-    "text_viewer": {
-        "content": [],
-        "scroll_y": 0,
-        "path": ""
-    },
-    "focus": {
-        "end_time": 0,
-        "duration": 0,
-        "active": False,
-        "blink_timer": 0
-    }
-}
+
 
 stats = {"cpu_temp": 0, "ram_usage": 0, "last_update": 0}
 
@@ -107,6 +82,7 @@ MENUS = {
         {"label": "< BACK", "action": "BACK", "color": GRAY},
     ],
     "PHOTOS": [
+        {"label": "GIFs", "action": "GIF:GIFs", "color": GREEN},
         {"label": "PERSO", "action": "SLIDESHOW:Perso", "color": PINK},
         {"label": "REMOTE", "action": "SLIDESHOW:Remote", "color": BLUE},
         {"label": "< BACK", "action": "BACK", "color": GRAY},
@@ -116,6 +92,44 @@ MENUS = {
         {"label": "REMOTE", "action": "TEXT:Remote", "color": BLUE},
         {"label": "< BACK", "action": "BACK", "color": GRAY},
     ]
+}
+
+# State
+state = {
+    "mode": "FACE", # FACE, MENU, STATS, CLOCK, NOTES, HEART, SLIDESHOW, TEXT_VIEWER, FOCUS, GIF_PLAYER
+    "expression": "happy",
+    "last_interaction": 0,
+    "love_note": "You are amazing!",
+    "menu_stack": ["MAIN"],
+    "menu_page": 0,
+    "slideshow": {
+        "path": "",
+        "images": [],
+        "index": 0,
+        "last_switch": 0,
+        "current_surface": None
+    },
+    "text_viewer": {
+        "content": [],
+        "scroll_y": 0,
+        "path": ""
+    },
+    "focus": {
+        "end_time": 0,
+        "duration": 0,
+        "active": False,
+        "blink_timer": 0
+    },
+    "gif_player": {
+        "path": "",
+        "gifs": [],
+        "current_gif_index": 0,
+        "frames": [],
+        "frame_index": 0,
+        "last_frame_time": 0,
+        "frame_duration": 0.1,
+        "gif_switch_time": 0
+    }
 }
 
 # --- SYSTEM STATS ---
@@ -230,6 +244,106 @@ def draw_slideshow(screen):
         x = (WIDTH - surf.get_width()) // 2
         y = (HEIGHT - surf.get_height()) // 2
         screen.blit(surf, (x, y))
+
+# --- GIF PLAYER FUNCTIONS ---
+def start_gif_player(subdir):
+    path = os.path.join(NEXTCLOUD_PATH, "Photos", subdir)
+    state["gif_player"]["path"] = path
+    state["gif_player"]["gifs"] = []
+    
+    # Scan for GIFs
+    if os.path.exists(path):
+        for f in os.listdir(path):
+            if f.lower().endswith('.gif'):
+                state["gif_player"]["gifs"].append(os.path.join(path, f))
+    
+    if not state["gif_player"]["gifs"]:
+        print(f"No GIFs found in {path}")
+        state["mode"] = "MENU"
+        return
+        
+    state["gif_player"]["current_gif_index"] = 0
+    state["gif_player"]["gif_switch_time"] = time.time()
+    load_next_gif()
+    state["mode"] = "GIF_PLAYER"
+
+def load_next_gif():
+    """Load all frames from current GIF"""
+    gifs = state["gif_player"]["gifs"]
+    if not gifs:
+        return
+    
+    gif_path = gifs[state["gif_player"]["current_gif_index"]]
+    state["gif_player"]["frames"] = []
+    state["gif_player"]["frame_index"] = 0
+    
+    try:
+        pil_gif = Image.open(gif_path)
+        
+        # Get frame duration (in milliseconds, convert to seconds)
+        try:
+            duration = pil_gif.info.get('duration', 100) / 1000.0
+        except:
+            duration = 0.1
+        state["gif_player"]["frame_duration"] = duration
+        
+        # Extract all frames
+        frame_num = 0
+        while True:
+            try:
+                pil_gif.seek(frame_num)
+                frame = pil_gif.convert('RGB')
+                
+                # Scale to fit screen
+                img_w, img_h = frame.size
+                scale = min(WIDTH / img_w, HEIGHT / img_h)
+                new_size = (int(img_w * scale), int(img_h * scale))
+                frame = frame.resize(new_size, Image.Resampling.NEAREST)  # NEAREST for pixel art
+                
+                # Convert to Pygame
+                mode = frame.mode
+                size = frame.size
+                data = frame.tobytes()
+                pygame_frame = pygame.image.fromstring(data, size, mode)
+                
+                state["gif_player"]["frames"].append(pygame_frame)
+                frame_num += 1
+            except EOFError:
+                break
+        
+        print(f"Loaded GIF with {len(state['gif_player']['frames'])} frames")
+    except Exception as e:
+        print(f"Error loading GIF: {e}")
+
+def update_gif():
+    """Update GIF animation"""
+    # Check if time to switch to next GIF (every 30 seconds)
+    if time.time() - state["gif_player"]["gif_switch_time"] > 30.0:
+        gifs = state["gif_player"]["gifs"]
+        state["gif_player"]["current_gif_index"] = (state["gif_player"]["current_gif_index"] + 1) % len(gifs)
+        state["gif_player"]["gif_switch_time"] = time.time()
+        load_next_gif()
+    
+    # Animate current GIF
+    if time.time() - state["gif_player"]["last_frame_time"] > state["gif_player"]["frame_duration"]:
+        state["gif_player"]["last_frame_time"] = time.time()
+        frames = state["gif_player"]["frames"]
+        if frames:
+            state["gif_player"]["frame_index"] = (state["gif_player"]["frame_index"] + 1) % len(frames)
+
+def draw_gif(screen):
+    screen.fill(BLACK)
+    
+    frames = state["gif_player"]["frames"]
+    if not frames:
+        txt = FONT_MEDIUM.render("No GIF loaded", False, WHITE)
+        screen.blit(txt, (WIDTH//2 - txt.get_width()//2, HEIGHT//2))
+        return
+    
+    frame = frames[state["gif_player"]["frame_index"]]
+    x = (WIDTH - frame.get_width()) // 2
+    y = (HEIGHT - frame.get_height()) // 2
+    screen.blit(frame, (x, y))
 
 # --- TEXT VIEWER FUNCTIONS ---
 def start_text_viewer(subdir):
@@ -614,6 +728,8 @@ def main():
                             if state["mode"] == "NOTES": state["love_note"] = random.choice(LOVE_NOTES)
                         elif action.startswith("SLIDESHOW:"):
                             start_slideshow(action.split(":")[1])
+                        elif action.startswith("GIF:"):
+                            start_gif_player(action.split(":")[1])
                         elif action.startswith("TEXT:"):
                             start_text_viewer(action.split(":")[1])
                         elif action.startswith("FOCUS:"):
@@ -638,6 +754,9 @@ def main():
         if state["mode"] == "SLIDESHOW":
             update_slideshow()
             draw_slideshow(screen)
+        elif state["mode"] == "GIF_PLAYER":
+            update_gif()
+            draw_gif(screen)
         elif state["mode"] == "TEXT_VIEWER":
             draw_text_viewer(screen)
         elif state["mode"] == "FOCUS":
