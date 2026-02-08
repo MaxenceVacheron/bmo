@@ -17,11 +17,11 @@ NEXTCLOUD_PATH = "/home/pi/mnt/nextcloud/shr/BMO_Agnes"
 os.environ["SDL_VIDEODRIVER"] = "dummy"
 pygame.init()
 
-# Create Surface matching Framebuffer format (RGB565) explicitly
-# R mask: 1111100000000000 (0xF800)
+# Create Surface matching Framebuffer format (BGR565) - Raspberry Pi uses BGR!
+# B mask: 1111100000000000 (0xF800)
 # G mask: 0000011111100000 (0x07E0)
-# B mask: 0000000000011111 (0x001F)
-screen = pygame.Surface((WIDTH, HEIGHT), depth=16, masks=(0xF800, 0x07E0, 0x001F, 0))
+# R mask: 0000000000011111 (0x001F)
+screen = pygame.Surface((WIDTH, HEIGHT), depth=16, masks=(0x001F, 0x07E0, 0xF800, 0))
 
 # Colors
 BLACK = (20, 24, 28)
@@ -198,8 +198,8 @@ def update_slideshow():
             new_size = (int(img_rect.width * scale), int(img_rect.height * scale))
             img = pygame.transform.scale(img, new_size)
             
-            # Convert to screen format by creating a surface with same format
-            converted = pygame.Surface(img.get_size(), depth=16, masks=(0xF800, 0x07E0, 0x001F, 0))
+            # Convert to screen format by creating a surface with same format (BGR565)
+            converted = pygame.Surface(img.get_size(), depth=16, masks=(0x001F, 0x07E0, 0xF800, 0))
             converted.blit(img, (0, 0))
             
             state["slideshow"]["current_surface"] = converted
