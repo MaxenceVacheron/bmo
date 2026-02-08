@@ -25,7 +25,7 @@ IDLE_THOUGHT_DIR = "/home/pi/bmo/bmo_assets/idle/thought"
 
 def load_config():
     """Load configuration from file"""
-    defaults = {"brightness": 1.0, "default_mode": "FACE"}
+    defaults = {"brightness": 1.0, "default_mode": "FACE", "power_save": False}
     if os.path.exists(CONFIG_FILE):
         try:
             with open(CONFIG_FILE, 'r') as f:
@@ -39,7 +39,8 @@ def save_config():
     """Save configuration to file"""
     config = {
         "brightness": state.get("brightness", 1.0),
-        "default_mode": state.get("default_mode", "FACE")
+        "default_mode": state.get("default_mode", "FACE"),
+        "power_save": state.get("power_save", False)
     }
     try:
         with open(CONFIG_FILE, 'w') as f:
@@ -112,11 +113,21 @@ MENUS = {
         {"label": "< BACK", "action": "BACK", "color": GRAY},
     ],
     "SETTINGS": [
-        {"label": "BRIGHTNESS: 25%", "action": "BRIGHTNESS:0.25", "color": TEAL},
-        {"label": "BRIGHTNESS: 50%", "action": "BRIGHTNESS:0.50", "color": TEAL},
-        {"label": "BRIGHTNESS: 75%", "action": "BRIGHTNESS:0.75", "color": TEAL},
-        {"label": "BRIGHTNESS: 100%", "action": "BRIGHTNESS:1.0", "color": TEAL},
+        {"label": "BRIGHTNESS", "action": "MENU:BRIGHTNESS", "color": TEAL},
+        {"label": "POWER MGMT", "action": "MENU:POWER", "color": ORANGE},
         {"label": "BOOT MODE", "action": "MENU:DEFAULT_MODE", "color": BLUE},
+        {"label": "< BACK", "action": "BACK", "color": GRAY},
+    ],
+    "BRIGHTNESS": [
+        {"label": "25%", "action": "BRIGHTNESS:0.25", "color": TEAL},
+        {"label": "50%", "action": "BRIGHTNESS:0.50", "color": TEAL},
+        {"label": "75%", "action": "BRIGHTNESS:0.75", "color": TEAL},
+        {"label": "100%", "action": "BRIGHTNESS:1.0", "color": TEAL},
+        {"label": "< BACK", "action": "BACK", "color": GRAY},
+    ],
+    "POWER": [
+        {"label": "ENABLE ECO", "action": "SET_POWER:ON", "color": GREEN},
+        {"label": "DISABLE ECO", "action": "SET_POWER:OFF", "color": RED},
         {"label": "< BACK", "action": "BACK", "color": GRAY},
     ],
     "DEFAULT_MODE": [
@@ -243,6 +254,7 @@ state = {
     "cached_dim_surf": None,
     "last_brightness": -1.0,
     "tap_times": [], # For 5-tap shortcut
+    "power_save": False,
     "weather": {
         "temp": "--",
         "city": "Unknown",
@@ -1400,6 +1412,13 @@ def main():
     config = load_config()
     state["brightness"] = config.get("brightness", 1.0)
     state["default_mode"] = config.get("default_mode", "FACE")
+    state["power_save"] = config.get("power_save", False)
+
+    # Initial Power Save enforcement
+    if state["power_save"]:
+        subprocess.run(["/home/pi/bmo/power_save_on.sh"], shell=True)
+    else:
+        subprocess.run(["/home/pi/bmo/power_save_off.sh"], shell=True)
 
     # Load initial face
     load_random_face()
@@ -1531,6 +1550,20 @@ def main():
                             save_config()
                         elif action.startswith("SET_DEFAULT:"):
                             state["default_mode"] = action.split(":")[1]
+                            save_config()
+                            # Pop back to SETTINGS menu
+                            if len(state["menu_stack"]) > 1:
+                                state["menu_stack"].pop()
+                            state["menu_page"] = 0
+                            state["mode"] = "MENU"
+                        elif action.startswith("SET_POWER:"):
+                            val = action.split(":")[1]
+                            if val == "ON":
+                                state["power_save"] = True
+                                subprocess.run(["/home/pi/bmo/power_save_on.sh"], shell=True)
+                            else:
+                                state["power_save"] = False
+                                subprocess.run(["/home/pi/bmo/power_save_off.sh"], shell=True)
                             save_config()
                             # Pop back to SETTINGS menu
                             if len(state["menu_stack"]) > 1:
@@ -1685,7 +1718,18 @@ def main():
                 sys.stdout.flush()
                 sys.exit(1)
             
-        clock.tick(30)
+        # FPS Control: Slow down to 5 FPS in FACE mode if Power Save is ON
+        current_fps = 30
+        if state["power_save"] and state["mode"] == "FACE":
+            current_fps = 5
+        
+        # Auto-Dimming in Power Save Mode
+        if state["power_save"] and now - state["last_interaction"] > 120: # 2 minutes
+            if state["brightness"] > 0.1:
+                state["brightness"] = 0.1
+                state["needs_redraw"] = True
+
+        clock.tick(current_fps)
         frame_count += 1
     
     os.close(fb_fd)
