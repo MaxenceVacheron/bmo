@@ -342,18 +342,47 @@ def draw_menu(screen):
     title = FONT_MEDIUM.render(f"BMO MENU: {current_menu_id}", False, WHITE)
     screen.blit(title, (WIDTH//2 - title.get_width()//2, 10))
     
+    # Pagination Logic
+    items_per_page = 5
+    total_pages = (len(items) + items_per_page - 1) // items_per_page
+    
+    # Clamp page
+    if state["menu_page"] >= total_pages: state["menu_page"] = total_pages - 1
+    if state["menu_page"] < 0: state["menu_page"] = 0
+    
+    page = state["menu_page"]
+    start_idx = page * items_per_page
+    end_idx = start_idx + items_per_page
+    visible_items = items[start_idx:end_idx]
+    
     start_y = 60
     item_height = 40
     margin = 5
     
-    visible_items = items[:6]
-    
+    # Draw Menu Items
     for i, item in enumerate(visible_items):
         y = start_y + i * (item_height + margin)
         btn_rect = (40, y, 400, item_height)
         pygame.draw.rect(screen, item.get("color", GRAY), btn_rect)
         lbl = FONT_SMALL.render(item["label"], False, BLACK)
         screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, y + 10))
+
+    # Draw Navigation Buttons (Bottom Area)
+    nav_y = start_y + 5 * (item_height + margin)
+    
+    if page > 0:
+        # PREV Button
+        prev_rect = (40, nav_y, 190, item_height)
+        pygame.draw.rect(screen, GRAY, prev_rect)
+        lbl = FONT_SMALL.render("< PREV", False, BLACK)
+        screen.blit(lbl, (prev_rect[0] + prev_rect[2]//2 - lbl.get_width()//2, nav_y + 10))
+        
+    if page < total_pages - 1:
+        # NEXT Button
+        next_rect = (250, nav_y, 190, item_height)
+        pygame.draw.rect(screen, GRAY, next_rect)
+        lbl = FONT_SMALL.render("NEXT >", False, BLACK)
+        screen.blit(lbl, (next_rect[0] + next_rect[2]//2 - lbl.get_width()//2, nav_y + 10))
 
 def draw_stats(screen):
     screen.fill(YELLOW)
