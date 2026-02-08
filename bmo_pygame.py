@@ -99,7 +99,6 @@ MENUS = {
         {"label": "FOCUS", "action": "MENU:FOCUS", "color": GREEN}, # New Focus Menu
         {"label": "NEXTCLOUD", "action": "MENU:NEXTCLOUD", "color": BLUE},
         {"label": "GAMES", "action": "MENU:GAMES", "color": YELLOW},
-        {"label": "STATS", "action": "MODE:STATS", "color": YELLOW},
         {"label": "CLOCK", "action": "MODE:CLOCK", "color": BLUE},
         {"label": "WEATHER", "action": "MODE:WEATHER", "color": BLUE},
         {"label": "SYSTEM", "action": "MODE:ADVANCED_STATS", "color": GRAY},
@@ -242,8 +241,10 @@ state = {
     "snake": None, # Will hold SnakeGame instance
     "cached_dim_surf": None,
     "last_brightness": -1.0,
+    "tap_times": [], # For 5-tap shortcut
     "weather": {
         "temp": "--",
+        "city": "Unknown",
         "desc": "Loading...",
         "icon": "cloud",
         "last_update": 0
@@ -337,6 +338,28 @@ def draw_advanced_stats(screen):
     w = int(396 * (disk_p / 100.0))
     pygame.draw.rect(screen, BLUE, (42, y+32, w, 16))
 
+def auto_update_and_restart():
+    """Pull latest changes from Git and restart the service"""
+    print("🚀 BMO Auto-Update triggered!")
+    screen.fill(BLACK)
+    lbl = FONT_MEDIUM.render("UPDATING BMO...", False, WHITE)
+    screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, HEIGHT//2 - 20))
+    
+    # Write to framebuffer directly for immediate feedback
+    try:
+        with open(FB_DEVICE, "wb") as f:
+            f.write(screen.get_buffer())
+    except: pass
+    
+    try:
+        # Run git pull
+        subprocess.run(["git", "pull"], cwd="/home/pi/bmo", timeout=30)
+        # Restart the systemd service
+        os.system("sudo systemctl restart bmo &")
+        sys.exit(0)
+    except Exception as e:
+        print(f"Error during update: {e}")
+
 def get_weather():
     """Fetch current weather from wttr.in"""
     try:
@@ -344,6 +367,8 @@ def get_weather():
         with urllib.request.urlopen(url, timeout=5) as response:
             data = json.loads(response.read().decode())
             current = data['current_condition'][0]
+            area = data['nearest_area'][0]
+            city = area['areaName'][0]['value']
             temp = current['temp_C']
             desc = current['weatherDesc'][0]['value']
             # Map description to icons
@@ -355,13 +380,14 @@ def get_weather():
             elif "storm" in desc_lower or "thunder" in desc_lower: icon = "storm"
             
             state["weather"] = {
-                "temp": f"{temp}C",
+                "temp": f"{temp}°C",
+                "city": city,
                 "desc": desc,
                 "icon": icon,
                 "last_update": time.time()
             }
             state["needs_redraw"] = True
-            print(f"Weather updated: {temp}C, {desc}")
+            print(f"Weather updated for {city}: {temp}C, {desc}")
     except Exception as e:
         print(f"Error fetching weather: {e}")
 
@@ -373,7 +399,11 @@ def draw_weather(screen):
     if now - state["weather"]["last_update"] > 1200:
         threading.Thread(target=get_weather, daemon=True).start()
     
-    # Draw Background pattern (simple clouds or sun rays)
+    # Header area (City)
+    pygame.draw.rect(screen, BLACK, (0, 0, WIDTH, 40))
+    city_lbl = FONT_SMALL.render(state["weather"]["city"].upper(), False, WHITE)
+    screen.blit(city_lbl, (WIDTH//2 - city_lbl.get_width()//2, 10))
+
     # Icon
     icon_name = state["weather"]["icon"]
     icon_path = f"/home/pi/bmo/bmo_assets/weather/{icon_name}.png"
@@ -383,18 +413,18 @@ def draw_weather(screen):
             img = img.resize((150, 150), Image.Resampling.LANCZOS)
             data = img.tobytes()
             pygame_img = pygame.image.fromstring(data, img.size, img.mode)
-            screen.blit(pygame_img, (WIDTH//2 - 75, 40))
+            screen.blit(pygame_img, (WIDTH//2 - 75, 50))
         except:
             pass
             
     # Temp
     temp_lbl = FONT_LARGE.render(state["weather"]["temp"], False, BLACK)
-    screen.blit(temp_lbl, (WIDTH//2 - temp_lbl.get_width()//2, 200))
+    screen.blit(temp_lbl, (WIDTH//2 - temp_lbl.get_width()//2, 210))
     
     # Description
     desc = state["weather"]["desc"]
     desc_lbl = FONT_SMALL.render(desc, False, BLACK)
-    screen.blit(desc_lbl, (WIDTH//2 - desc_lbl.get_width()//2, 270))
+    screen.blit(desc_lbl, (WIDTH//2 - desc_lbl.get_width()//2, 275))
 
 # --- TOUCH INPUT THREAD ---
 def touch_thread():
@@ -1230,9 +1260,17 @@ def main():
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = event.pos
+                now = time.time()
+                state["tap_times"].append(now)
+                state["tap_times"] = state["tap_times"][-5:]
+                
+                if len(state["tap_times"]) == 5:
+                    if state["tap_times"][-1] - state["tap_times"][0] < 2.0:
+                        auto_update_and_restart()
+
                 state["last_touch_pos"] = (x, y)
-                state["last_touch_pos_time"] = time.time()
-                state["last_interaction"] = time.time()
+                state["last_touch_pos_time"] = now
+                state["last_interaction"] = now
                 
                 # If showing a pop-up face, any touch dismisses it
                 if state["is_showing_pop_face"]:
