@@ -639,7 +639,7 @@ def update_face():
             state["middle_finger_timer"] = now + random.uniform(5.0, 10.0)
         elif now > state["middle_finger_timer"]:
             # 20% chance to show middle finger
-            if random.random() < 0.2:
+            if random.random() < 0.8:
                 state["show_middle_finger"] = True
                 state["middle_finger_end_time"] = now + 2.0  # Show for 2 seconds
             state["middle_finger_timer"] = now + random.uniform(5.0, 10.0)
