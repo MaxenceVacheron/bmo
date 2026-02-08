@@ -4,18 +4,19 @@ import time
 import random
 import pygame
 import threading
+import math
 from evdev import InputDevice, ecodes
 
 # --- CONFIGURATION ---
 WIDTH, HEIGHT = 480, 320
 FB_DEVICE = "/dev/fb0"
 TOUCH_DEVICE = "/dev/input/event6" # Ensure this matches detected device
+NEXTCLOUD_PATH = "/home/pi/mnt/nextcloud/shr/BMO_Agnes"
 
 # Initialize Pygame Headless
 os.environ["SDL_VIDEODRIVER"] = "dummy"
 pygame.init()
 
-# Create Surface matching Framebuffer format (RGB565)
 # Create Surface matching Framebuffer format (RGB565) explicitly
 # R mask: 1111100000000000 (0xF800)
 # G mask: 0000011111100000 (0x07E0)
@@ -31,6 +32,7 @@ YELLOW = (241, 196, 15)
 RED = (231, 76, 60)
 BLUE = (52, 152, 219)
 GREEN = (46, 204, 113)
+GRAY = (127, 140, 141)
 
 # Fonts
 try:
@@ -44,10 +46,23 @@ except:
 
 # State
 state = {
-    "mode": "FACE",
+    "mode": "FACE", # FACE, MENU, STATS, CLOCK, NOTES, HEART, SLIDESHOW, TEXT_VIEWER
     "expression": "happy",
     "last_interaction": 0,
     "love_note": "You are amazing!",
+    "menu_stack": ["MAIN"], # Stack of menu identifiers
+    "slideshow": {
+        "path": "",
+        "images": [],
+        "index": 0,
+        "last_switch": 0,
+        "current_surface": None
+    },
+    "text_viewer": {
+        "content": [],
+        "scroll_y": 0,
+        "path": ""
+    }
 }
 
 stats = {"cpu_temp": 0, "ram_usage": 0, "last_update": 0}
@@ -60,6 +75,33 @@ LOVE_NOTES = [
     "I'm happy to be yours!",
     "You look great today!",
 ]
+
+# --- MENUS DEFINITION ---
+MENUS = {
+    "MAIN": [
+        {"label": "FACE", "action": "MODE:FACE", "color": TEAL},
+        {"label": "STATS", "action": "MODE:STATS", "color": YELLOW},
+        {"label": "NEXTCLOUD", "action": "MENU:NEXTCLOUD", "color": BLUE}, # New!
+        {"label": "CLOCK", "action": "MODE:CLOCK", "color": BLUE},
+        {"label": "NOTES", "action": "MODE:NOTES", "color": RED},
+        {"label": "HEART", "action": "MODE:HEART", "color": PINK},
+    ],
+    "NEXTCLOUD": [
+        {"label": "PHOTOS", "action": "MENU:PHOTOS", "color": YELLOW},
+        {"label": "TEXTES", "action": "MENU:TEXTES", "color": GREEN},
+        {"label": "< BACK", "action": "BACK", "color": GRAY},
+    ],
+    "PHOTOS": [
+        {"label": "PERSO", "action": "SLIDESHOW:Perso", "color": PINK},
+        {"label": "REMOTE", "action": "SLIDESHOW:Remote", "color": BLUE},
+        {"label": "< BACK", "action": "BACK", "color": GRAY},
+    ],
+    "TEXTES": [
+        {"label": "PERSO", "action": "TEXT:Perso", "color": PINK},
+        {"label": "REMOTE", "action": "TEXT:Remote", "color": BLUE},
+        {"label": "< BACK", "action": "BACK", "color": GRAY},
+    ]
+}
 
 # --- SYSTEM STATS ---
 def get_cpu_temp():
@@ -82,8 +124,6 @@ def touch_thread():
     try:
         dev = InputDevice(TOUCH_DEVICE)
         raw_x, raw_y = 0, 0
-        current_touch_id = None
-        
         last_finger_state = False
         finger_down = False
         
@@ -106,37 +146,160 @@ def touch_thread():
     except Exception as e:
         print(f"Touch Error: {e}")
 
-# --- DRAWING FUNCTIONS ---
+# --- SLIDESHOW FUNCTIONS ---
+def start_slideshow(subdir):
+    path = os.path.join(NEXTCLOUD_PATH, "Photos", subdir)
+    state["slideshow"]["path"] = path
+    state["slideshow"]["images"] = []
+    
+    # Scan for images
+    if os.path.exists(path):
+        for f in os.listdir(path):
+            if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp')):
+                state["slideshow"]["images"].append(os.path.join(path, f))
+    
+    if not state["slideshow"]["images"]:
+        print(f"No images found in {path}")
+        state["slideshow"]["images"] = ["PLACEHOLDER_EMPTY"]
+        
+    state["slideshow"]["index"] = 0
+    state["slideshow"]["last_switch"] = 0 # Force immediate load
+    state["mode"] = "SLIDESHOW"
+
+def update_slideshow():
+    # Check if time to switch
+    if time.time() - state["slideshow"]["last_switch"] > 5.0:
+        state["slideshow"]["last_switch"] = time.time()
+        
+        imgs = state["slideshow"]["images"]
+        if not imgs or imgs[0] == "PLACEHOLDER_EMPTY":
+            return # Nothing to do
+
+        # Load next image
+        try:
+            img_path = imgs[state["slideshow"]["index"]]
+            img = pygame.image.load(img_path)
+            
+            # Scale to fit (maintain aspect ratio)
+            img_rect = img.get_rect()
+            scale = min(WIDTH / img_rect.width, HEIGHT / img_rect.height)
+            new_size = (int(img_rect.width * scale), int(img_rect.height * scale))
+            img = pygame.transform.scale(img, new_size)
+            
+            state["slideshow"]["current_surface"] = img
+            
+            # Next index
+            state["slideshow"]["index"] = (state["slideshow"]["index"] + 1) % len(imgs)
+        except Exception as e:
+            print(f"Error loading image: {e}")
+            # Skip this image next time?
+            state["slideshow"]["index"] = (state["slideshow"]["index"] + 1) % len(imgs)
+
+def draw_slideshow(screen):
+    screen.fill(BLACK)
+    
+    if not state["slideshow"]["images"] or state["slideshow"]["images"][0] == "PLACEHOLDER_EMPTY":
+        txt = FONT_MEDIUM.render("No Images Found", False, WHITE)
+        screen.blit(txt, (WIDTH//2 - txt.get_width()//2, HEIGHT//2))
+        return
+
+    surf = state["slideshow"]["current_surface"]
+    if surf:
+        # Center the image
+        x = (WIDTH - surf.get_width()) // 2
+        y = (HEIGHT - surf.get_height()) // 2
+        screen.blit(surf, (x, y))
+
+# --- TEXT VIEWER FUNCTIONS ---
+def start_text_viewer(subdir):
+    path = os.path.join(NEXTCLOUD_PATH, "Textes", subdir)
+    # Find first txt file? Or list them?
+    # User said "display a slideshow of photos... text same, either personal or remote".
+    # Assuming one big text file or all text files?
+    # Let's try to find ANY .txt file in the folder.
+    
+    found_file = None
+    if os.path.exists(path):
+        for f in os.listdir(path):
+            if f.lower().endswith('.txt'):
+                found_file = os.path.join(path, f)
+                break
+    
+    state["text_viewer"]["content"] = []
+    if found_file:
+        try:
+            with open(found_file, 'r') as f:
+                content = f.read()
+                # Wrap text
+                words = content.split(' ')
+                line = []
+                for w in words:
+                    line.append(w)
+                    if FONT_SMALL.size(' '.join(line))[0] > 440:
+                        line.pop()
+                        state["text_viewer"]["content"].append(' '.join(line))
+                        line = [w]
+                state["text_viewer"]["content"].append(' '.join(line))
+        except:
+            state["text_viewer"]["content"] = ["Error reading file."]
+    else:
+        state["text_viewer"]["content"] = ["No text file found.", f"Path: {path}"]
+        
+    state["mode"] = "TEXT_VIEWER"
+
+def draw_text_viewer(screen):
+    screen.fill(BLACK)
+    
+    y = 20
+    for line in state["text_viewer"]["content"]:
+        if y > HEIGHT - 20: break # Simple clipping
+        txt = FONT_SMALL.render(line, False, WHITE)
+        screen.blit(txt, (20, y))
+        y += 25
+    
+    # Scroll indicator or helper
+    hint = FONT_SMALL.render("Tap to Close", False, GRAY)
+    screen.blit(hint, (WIDTH - hint.get_width() - 10, HEIGHT - 30))
+
+# --- COMMON DRAWING ---
 def draw_face(screen):
     screen.fill(TEAL)
     pygame.draw.circle(screen, BLACK, (140, 120), 15)
     pygame.draw.circle(screen, BLACK, (340, 120), 15)
     
-    # Mouth (Simple Round Smile)
     if state["expression"] == "happy":
-        # Arc: Rect(x, y, w, h), StartAngle, StopAngle, Width
-        # Angle 3.14 (Pi) to 0 (2Pi) is the bottom half in Pygame's inverted Y-axis logic? 
-        # Actually in Pygame arc: 0 is right, 3.14 is left. Clockwise?
-        # Let's try standard bottom arc: Pi (Left) to 2*Pi (Right) or 0.
+        # Simple Round Smile (Arc)
         pygame.draw.arc(screen, BLACK, (190, 170, 100, 50), 3.14, 6.28, 4)
-    
-    # Cheeks Removed (As requested for show usage)
+    # No Cheeks
 
 def draw_menu(screen):
     screen.fill(WHITE)
+    
+    # Get current menu from stack
+    current_menu_id = state["menu_stack"][-1]
+    items = MENUS.get(current_menu_id, MENUS["MAIN"])
+    
+    # Header
     pygame.draw.rect(screen, BLACK, (0, 0, WIDTH, 50))
-    title = FONT_MEDIUM.render("BMO MENU", False, WHITE)
+    title = FONT_MEDIUM.render(f"BMO MENU: {current_menu_id}", False, WHITE)
     screen.blit(title, (WIDTH//2 - title.get_width()//2, 10))
     
-    options = ["FACE", "STATS", "CLOCK", "NOTES", "HEART"]
-    colors = [TEAL, YELLOW, BLUE, RED, PINK]
+    # Calculate layout to center items vertically? Or scroll?
+    # Max 6 items fit easily.
     
-    y = 60
-    for i, opt in enumerate(options):
-        btn_rect = (40, y + i*50, 400, 40)
-        pygame.draw.rect(screen, colors[i % len(colors)], btn_rect)
-        lbl = FONT_SMALL.render(opt, False, BLACK)
-        screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, y + i*50 + 10))
+    start_y = 60
+    item_height = 40
+    margin = 5
+    
+    visible_items = items[:6] # Limit display
+    
+    for i, item in enumerate(visible_items):
+        y = start_y + i * (item_height + margin)
+        btn_rect = (40, y, 400, item_height)
+        
+        pygame.draw.rect(screen, item.get("color", GRAY), btn_rect)
+        lbl = FONT_SMALL.render(item["label"], False, BLACK)
+        screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, y + 10))
 
 def draw_stats(screen):
     screen.fill(YELLOW)
@@ -192,7 +355,6 @@ def draw_heart(screen):
     scale = 1.0 + (pulse if pulse < 0.5 else 0)
     
     center = (WIDTH//2, HEIGHT//2)
-    # Simple polygon heart
     size = 20 * scale
     pts = [
         (center[0], center[1] + 3*size),
@@ -211,12 +373,6 @@ def main():
     
     clock = pygame.time.Clock()
     
-import math
-
-# ... (rest of imports)
-
-# ... inside main() ...
-
     # Open FB0 for raw write
     fb_fd = os.open(FB_DEVICE, os.O_RDWR)
     
@@ -228,8 +384,7 @@ import math
         pygame.draw.circle(screen, BLACK, (140, 120), 15)
         pygame.draw.circle(screen, BLACK, (340, 120), 15)
         pygame.draw.arc(screen, BLACK, (200, 180, 80, 40), 3.14, 6.28, 5)
-        pygame.draw.circle(screen, PINK, (110, 150), 15)
-        pygame.draw.circle(screen, PINK, (370, 150), 15)
+        # No Cheeks
         
         # Bouncing Text
         t = (time.time() - start_time) * 8
@@ -251,53 +406,85 @@ import math
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = event.pos
-                state["last_touch_pos"] = (x, y) # Store for debug crosshair
+                state["last_touch_pos"] = (x, y)
                 state["last_interaction"] = time.time()
                 
+                # --- INTERACTION LOGIC ---
                 if state["mode"] == "FACE":
                     state["mode"] = "MENU"
+                    state["menu_stack"] = ["MAIN"] # Reset to main menu
+                
                 elif state["mode"] == "MENU":
-                    clicked_idx = (y - 60) // 50
-                    if 0 <= clicked_idx < 5:
-                        options = ["FACE", "STATS", "CLOCK", "NOTES", "HEART"]
-                        state["mode"] = options[int(clicked_idx)]
-                        if state["mode"] == "NOTES":
-                            state["love_note"] = random.choice(LOVE_NOTES)
-                else:
+                    # Handle Menu Clicks
+                    current_menu_id = state["menu_stack"][-1]
+                    items = MENUS.get(current_menu_id, MENUS["MAIN"])
+                    
+                    # Y starts 60, height 40, margin 5 -> step 45
+                    clicked_idx = (y - 60) // 45
+                    
+                    if 0 <= clicked_idx < len(items):
+                        action = items[int(clicked_idx)]["action"]
+                        
+                        if action == "BACK":
+                            state["menu_stack"].pop()
+                            if not state["menu_stack"]: # Empty? Back to face
+                                state["mode"] = "FACE"
+                                
+                        elif action.startswith("MENU:"):
+                            new_menu = action.split(":")[1]
+                            state["menu_stack"].append(new_menu)
+                            
+                        elif action.startswith("MODE:"):
+                            new_mode = action.split(":")[1]
+                            state["mode"] = new_mode
+                            if new_mode == "NOTES":
+                                state["love_note"] = random.choice(LOVE_NOTES)
+                                
+                        elif action.startswith("SLIDESHOW:"):
+                            subdir = action.split(":")[1]
+                            start_slideshow(subdir)
+                            
+                        elif action.startswith("TEXT:"):
+                            subdir = action.split(":")[1]
+                            start_text_viewer(subdir)
+                
+                else: 
+                    # In any Sub-Mode (STATS, SLIDESHOW...), click returns to MENU
                     state["mode"] = "MENU"
+                    # Keep current menu stack or reset?
+                    # Usually better to return to where we were.
+                    # But if we were deeply nested (Photos->Perso), maybe return to PHOTOS menu?
+                    # Yes, keep menu stack.
         
-        # Draw Logic
-        if state["mode"] == "FACE": draw_face(screen)
+        # --- UPDATE & DRAW ---
+        if state["mode"] == "SLIDESHOW":
+            update_slideshow()
+            draw_slideshow(screen)
+        elif state["mode"] == "TEXT_VIEWER":
+            draw_text_viewer(screen)
+        elif state["mode"] == "FACE": draw_face(screen)
         elif state["mode"] == "MENU": draw_menu(screen)
         elif state["mode"] == "STATS": draw_stats(screen)
         elif state["mode"] == "CLOCK": draw_clock(screen)
         elif state["mode"] == "NOTES": draw_notes(screen)
         elif state["mode"] == "HEART": draw_heart(screen)
         
-        # --- DEBUG: TOUCH CROSSHAIR ---
-        # Draw a cross at the last registered touch position to verify calibration
+        # Crosshair Debug
         if "last_touch_pos" in state:
             tx, ty = state["last_touch_pos"]
-            # Draw distinct crosshair (Black with White outline for visibility on any background)
             pygame.draw.line(screen, WHITE, (tx-10, ty), (tx+10, ty), 3)
             pygame.draw.line(screen, WHITE, (tx, ty-10), (tx, ty+10), 3)
             pygame.draw.line(screen, BLACK, (tx-10, ty), (tx+10, ty), 1)
             pygame.draw.line(screen, BLACK, (tx, ty-10), (tx, ty+10), 1)
         
-        # Blit to Framebuffer (Zero Copy optimization possible?)
-        # Pygame surface buffer is memory view.
-        # We need byte string.
-        # Check if surface is locked? Usually not unless manual lock.
-        # For RGB565 surface, get_buffer returns raw pixel data.
-        
+        # Blit to Framebuffer
         try:
-            # Write entire buffer to FB0
             os.lseek(fb_fd, 0, os.SEEK_SET)
             os.write(fb_fd, screen.get_buffer())
         except Exception as e:
-            print(f"FB Write Error: {e}")
+            pass # print(f"FB Write Error: {e}")
             
-        clock.tick(30) # 30 FPS cap
+        clock.tick(30)
     
     os.close(fb_fd)
     pygame.quit()
