@@ -519,21 +519,51 @@ def main():
                 if state["mode"] == "FACE":
                     state["mode"] = "MENU"
                     state["menu_stack"] = ["MAIN"]
+                    state["menu_page"] = 0 # Reset page when entering menu
                 
                 elif state["mode"] == "MENU":
                     current_menu_id = state["menu_stack"][-1]
                     items = MENUS.get(current_menu_id, MENUS["MAIN"])
-                    clicked_idx = (y - 60) // 45
                     
-                    if 0 <= clicked_idx < len(items):
-                        action = items[int(clicked_idx)]["action"]
+                    # Layout Params (same as draw)
+                    start_y = 60
+                    item_height = 40
+                    margin = 5
+                    nav_y = start_y + 5 * (item_height + margin)
+                    
+                    # Check Item Clicks
+                    clicked_item_idx = -1
+                    if start_y <= y < nav_y:
+                        row = (y - start_y) // (item_height + margin)
+                        if 0 <= row < 5:
+                            # Map row to item index based on page
+                            real_idx = (state["menu_page"] * 5) + int(row)
+                            if real_idx < len(items):
+                                clicked_item_idx = real_idx
+                    
+                    # Check Nav Clicks
+                    elif nav_y <= y < nav_y + item_height:
+                        # Left (Prev) or Right (Next)
+                        if x < WIDTH // 2: # PREV
+                            if state["menu_page"] > 0:
+                                state["menu_page"] -= 1
+                        else: # NEXT
+                            total_pages = (len(items) + 5 - 1) // 5
+                            if state["menu_page"] < total_pages - 1:
+                                state["menu_page"] += 1
+                                
+                    if clicked_item_idx != -1:
+                        action = items[clicked_item_idx]["action"]
                         if action == "BACK":
                             state["menu_stack"].pop()
+                            state["menu_page"] = 0 # Reset page when going back
                             if not state["menu_stack"]: state["mode"] = "FACE"
                         elif action.startswith("MENU:"):
                             state["menu_stack"].append(action.split(":")[1])
+                            state["menu_page"] = 0 # Reset page for new menu
                         elif action.startswith("MODE:"):
                             state["mode"] = action.split(":")[1]
+                            state["menu_page"] = 0
                             if state["mode"] == "NOTES": state["love_note"] = random.choice(LOVE_NOTES)
                         elif action.startswith("SLIDESHOW:"):
                             start_slideshow(action.split(":")[1])
