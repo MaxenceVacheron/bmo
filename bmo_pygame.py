@@ -1198,8 +1198,8 @@ def draw_menu(screen):
     title = FONT_MEDIUM.render(f"BMO MENU: {current_menu_id}", False, WHITE)
     screen.blit(title, (WIDTH//2 - title.get_width()//2, 10))
     
-    # Pagination Logic
-    items_per_page = 5
+    # Pagination Logic (2x2 Grid = 4 items per page)
+    items_per_page = 4
     total_pages = (len(items) + items_per_page - 1) // items_per_page
     
     # Clamp page
@@ -1208,37 +1208,55 @@ def draw_menu(screen):
     
     page = state["menu_page"]
     start_idx = page * items_per_page
-    end_idx = start_idx + items_per_page
-    visible_items = items[start_idx:end_idx]
+    visible_items = items[start_idx:start_idx + items_per_page]
     
-    start_y = 60
-    item_height = 40
-    margin = 5
+    # Layout Params
+    cols, rows = 2, 2
+    btn_w, btn_h = 190, 70
+    gap = 20
+    start_x = (WIDTH - (cols * btn_w + (cols-1) * gap)) // 2
+    start_y = 70
     
-    # Draw Menu Items
+    # Draw Menu Items in Grid
     for i, item in enumerate(visible_items):
-        y = start_y + i * (item_height + margin)
-        btn_rect = (40, y, 400, item_height)
-        pygame.draw.rect(screen, item.get("color", GRAY), btn_rect)
-        lbl = FONT_SMALL.render(item["label"], False, BLACK)
-        screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, y + 10))
+        r = i // cols
+        c = i % cols
+        bx = start_x + c * (btn_w + gap)
+        by = start_y + r * (btn_h + gap)
+        
+        btn_rect = (bx, by, btn_w, btn_h)
+        pygame.draw.rect(screen, item.get("color", GRAY), btn_rect, border_radius=10)
+        
+        # Two-line text wrapping if too long
+        label = item["label"]
+        if " " in label and FONT_SMALL.size(label)[0] > btn_w - 10:
+            words = label.split(" ")
+            mid = len(words) // 2
+            l1 = FONT_TINY.render(" ".join(words[:mid]), False, BLACK)
+            l2 = FONT_TINY.render(" ".join(words[mid:]), False, BLACK)
+            screen.blit(l1, (bx + (btn_w - l1.get_width())//2, by + 15))
+            screen.blit(l2, (bx + (btn_w - l2.get_width())//2, by + 40))
+        else:
+            lbl = FONT_SMALL.render(label, False, BLACK)
+            screen.blit(lbl, (bx + (btn_w - lbl.get_width())//2, by + (btn_h - lbl.get_height())//2))
 
-    # Draw Navigation Buttons (Bottom Area)
-    nav_y = start_y + 5 * (item_height + margin)
+    # Draw Navigation Buttons (Centered at Bottom)
+    nav_y = 250
+    nav_h = 45
     
     if page > 0:
         # PREV Button
-        prev_rect = (40, nav_y, 190, item_height)
-        pygame.draw.rect(screen, GRAY, prev_rect)
+        prev_rect = (start_x, nav_y, btn_w, nav_h)
+        pygame.draw.rect(screen, GRAY, prev_rect, border_radius=5)
         lbl = FONT_SMALL.render("< PREV", False, BLACK)
-        screen.blit(lbl, (prev_rect[0] + prev_rect[2]//2 - lbl.get_width()//2, nav_y + 10))
+        screen.blit(lbl, (prev_rect[0] + (btn_w - lbl.get_width())//2, nav_y + 10))
         
     if page < total_pages - 1:
         # NEXT Button
-        next_rect = (250, nav_y, 190, item_height)
-        pygame.draw.rect(screen, GRAY, next_rect)
+        next_rect = (start_x + btn_w + gap, nav_y, btn_w, nav_h)
+        pygame.draw.rect(screen, GRAY, next_rect, border_radius=5)
         lbl = FONT_SMALL.render("NEXT >", False, BLACK)
-        screen.blit(lbl, (next_rect[0] + next_rect[2]//2 - lbl.get_width()//2, nav_y + 10))
+        screen.blit(lbl, (next_rect[0] + (btn_w - lbl.get_width())//2, nav_y + 10))
 
 def draw_stats(screen):
     screen.fill(YELLOW)
@@ -1455,33 +1473,35 @@ def main():
                 elif state["mode"] == "MENU":
                     current_menu_id = state["menu_stack"][-1]
                     items = MENUS.get(current_menu_id, MENUS["MAIN"])
+                    items_per_page = 4
                     
-                    # Layout Params (same as draw)
-                    start_y = 60
-                    item_height = 40
-                    margin = 5
-                    nav_y = start_y + 5 * (item_height + margin)
+                    # Layout Params (sync with draw_menu)
+                    cols, rows = 2, 2
+                    btn_w, btn_h = 190, 70
+                    gap = 20
+                    start_x = (WIDTH - (cols * btn_w + (cols-1) * gap)) // 2
+                    start_y = 70
+                    nav_y, nav_h = 250, 45
                     
-                    # Check Item Clicks
                     clicked_item_idx = -1
-                    if start_y <= y < nav_y:
-                        row = (y - start_y) // (item_height + margin)
-                        if 0 <= row < 5:
-                            # Map row to item index based on page
-                            real_idx = (state["menu_page"] * 5) + int(row)
+                    # Check Grid Hits
+                    for i in range(items_per_page):
+                        r, c = i // cols, i % cols
+                        bx = start_x + c * (btn_w + gap)
+                        by = start_y + r * (btn_h + gap)
+                        if bx <= x < bx + btn_w and by <= y < by + btn_h:
+                            real_idx = (state["menu_page"] * items_per_page) + i
                             if real_idx < len(items):
                                 clicked_item_idx = real_idx
+                                break
                     
-                    # Check Nav Clicks
-                    elif nav_y <= y < nav_y + item_height:
-                        # Left (Prev) or Right (Next)
-                        if x < WIDTH // 2: # PREV
-                            if state["menu_page"] > 0:
-                                state["menu_page"] -= 1
-                        else: # NEXT
-                            total_pages = (len(items) + 5 - 1) // 5
-                            if state["menu_page"] < total_pages - 1:
-                                state["menu_page"] += 1
+                    # Check Nav Hits
+                    if nav_y <= y < nav_y + nav_h:
+                        if start_x <= x < start_x + btn_w: # PREV
+                            if state["menu_page"] > 0: state["menu_page"] -= 1
+                        elif start_x + btn_w + gap <= x < start_x + 2*btn_w + gap: # NEXT
+                            total_pages = (len(items) + items_per_page - 1) // items_per_page
+                            if state["menu_page"] < total_pages - 1: state["menu_page"] += 1
                                 
                     if clicked_item_idx != -1:
                         action = items[clicked_item_idx]["action"]
