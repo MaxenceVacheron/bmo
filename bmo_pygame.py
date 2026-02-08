@@ -26,7 +26,7 @@ screen = pygame.Surface((WIDTH, HEIGHT), depth=16, masks=(0xF800, 0x07E0, 0x001F
 # Colors
 BLACK = (20, 24, 28)
 WHITE = (245, 247, 250)
-TEAL = (100, 220, 200)
+TEAL = (165, 215, 185) # Paler, minty teal for the screen face
 PINK = (255, 148, 178)
 YELLOW = (241, 196, 15)
 RED = (231, 76, 60)
@@ -633,12 +633,12 @@ def update_face():
     if state["show_middle_finger"]:
         if now > state["middle_finger_end_time"]:
             state["show_middle_finger"] = False
-            state["middle_finger_timer"] = now + random.uniform(10.0, 20.0)
+            state["middle_finger_timer"] = now + random.uniform(5.0, 10.0)
     else:
         if state["middle_finger_timer"] == 0:
             state["middle_finger_timer"] = now + random.uniform(5.0, 10.0)
         elif now > state["middle_finger_timer"]:
-            # 20% chance to show middle finger
+            # 80% chance to show middle finger
             if random.random() < 0.8:
                 state["show_middle_finger"] = True
                 state["middle_finger_end_time"] = now + 2.0  # Show for 2 seconds
@@ -649,15 +649,16 @@ def draw_face(screen):
     
     if state["is_blinking"]:
         # Draw closed eyes
-        pygame.draw.line(screen, BLACK, (125, 120), (155, 120), 5)
-        pygame.draw.line(screen, BLACK, (325, 120), (355, 120), 5)
+        pygame.draw.line(screen, BLACK, (130, 120), (150, 120), 5)
+        pygame.draw.line(screen, BLACK, (330, 120), (350, 120), 5)
     else:
-        # Draw open eyes
-        pygame.draw.circle(screen, BLACK, (140, 120), 15)
-        pygame.draw.circle(screen, BLACK, (340, 120), 15)
+        # Draw open eyes (smaller dots like the photo)
+        pygame.draw.circle(screen, BLACK, (140, 120), 9)
+        pygame.draw.circle(screen, BLACK, (340, 120), 9)
     
     if state["expression"] == "happy":
-        pygame.draw.arc(screen, BLACK, (190, 170, 100, 50), 3.14, 6.28, 4)
+        # Smaller, cuter smile centered like the figurine
+        pygame.draw.arc(screen, BLACK, (210, 140, 60, 40), 3.14, 6.28, 4)
     
     # Easter egg: middle finger
     if state["show_middle_finger"]:
