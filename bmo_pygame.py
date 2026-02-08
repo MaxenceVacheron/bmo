@@ -110,12 +110,18 @@ MENUS = {
 
 # State
 state = {
-    "mode": "FACE", # FACE, MENU, STATS, CLOCK, NOTES, HEART, SLIDESHOW, TEXT_VIEWER, FOCUS, GIF_PLAYER
+    "mode": "STARTUP", # Start with startup animation
     "expression": "happy",
     "last_interaction": 0,
     "love_note": "You are amazing!",
     "menu_stack": ["MAIN"],
     "menu_page": 0,
+    "startup": {
+        "message": "Hello Agnès! I'm BMO. Maxence built my brain just for you.",
+        "char_index": 0,
+        "start_time": 0,
+        "char_delay": 0.05  # 50ms per character
+    },
     "slideshow": {
         "path": "",
         "images": [],
@@ -458,6 +464,58 @@ def draw_text_viewer(screen):
         y += 25
     hint = FONT_SMALL.render("Tap to Close", False, GRAY)
     screen.blit(hint, (WIDTH - hint.get_width() - 10, HEIGHT - 30))
+
+# --- STARTUP ANIMATION ---
+def update_startup():
+    """Update typewriter animation"""
+    if state["startup"]["start_time"] == 0:
+        state["startup"]["start_time"] = time.time()
+    
+    elapsed = time.time() - state["startup"]["start_time"]
+    target_chars = int(elapsed / state["startup"]["char_delay"])
+    
+    if target_chars > len(state["startup"]["message"]):
+        # Animation complete, wait 2 seconds then go to FACE
+        if elapsed > len(state["startup"]["message"]) * state["startup"]["char_delay"] + 2.0:
+            state["mode"] = "FACE"
+    else:
+        state["startup"]["char_index"] = target_chars
+
+def draw_startup(screen):
+    screen.fill(TEAL)
+    
+    # Draw partial message (typewriter effect)
+    message = state["startup"]["message"]
+    visible_text = message[:state["startup"]["char_index"]]
+    
+    # Word wrap
+    words = visible_text.split(' ')
+    lines = []
+    line = []
+    for w in words:
+        line.append(w)
+        if FONT_MEDIUM.size(' '.join(line))[0] > WIDTH - 40:
+            line.pop()
+            lines.append(' '.join(line))
+            line = [w]
+    lines.append(' '.join(line))
+    
+    # Draw lines
+    y = HEIGHT // 2 - (len(lines) * 30) // 2
+    for l in lines:
+        surf = FONT_MEDIUM.render(l, False, BLACK)
+        screen.blit(surf, (WIDTH//2 - surf.get_width()//2, y))
+        y += 30
+    
+    # Blinking cursor
+    if state["startup"]["char_index"] < len(message):
+        if int(time.time() * 2) % 2 == 0:  # Blink every 0.5s
+            cursor = FONT_MEDIUM.render("_", False, BLACK)
+            # Position cursor at end of last line
+            last_line_surf = FONT_MEDIUM.render(lines[-1], False, BLACK)
+            cursor_x = WIDTH//2 - last_line_surf.get_width()//2 + last_line_surf.get_width()
+            cursor_y = y - 30
+            screen.blit(cursor, (cursor_x, cursor_y))
 
 # --- FOCUS MODE FUNCTIONS ---
 def start_focus_timer(minutes):
@@ -863,7 +921,10 @@ def main():
                     state["mode"] = "MENU"
         
         # --- UPDATE & DRAW ---
-        if state["mode"] == "SLIDESHOW":
+        if state["mode"] == "STARTUP":
+            update_startup()
+            draw_startup(screen)
+        elif state["mode"] == "SLIDESHOW":
             update_slideshow()
             draw_slideshow(screen)
         elif state["mode"] == "GIF_PLAYER":
