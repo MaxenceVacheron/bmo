@@ -611,7 +611,9 @@ def load_random_face():
                 img = img.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
                 data = img.tobytes()
                 pygame_img = pygame.image.fromstring(data, img.size, img.mode)
-                surf = pygame.Surface((WIDTH, HEIGHT), depth=16, masks=(0xF800, 0x07E0, 0x001F, 0))
+                
+                # Use EXACT masks from screen to prevent color shifts
+                surf = pygame.Surface((WIDTH, HEIGHT), depth=16, masks=screen.get_masks())
                 surf.blit(pygame_img, (0, 0))
                 return surf
 
@@ -621,10 +623,15 @@ def load_random_face():
             # Fallback if closed version doesn't exist
             if state["current_face_closed"] is None:
                 state["current_face_closed"] = state["current_face_open"]
+                print(f"Loaded face: {filename} (no closed version)")
+            else:
+                print(f"Loaded face: {filename} (with blink version)")
                 
             state["last_face_switch"] = time.time()
+            sys.stdout.flush()
         except Exception as e:
             print(f"Error loading face images: {e}")
+            sys.stdout.flush()
 
 # --- FOCUS MODE FUNCTIONS ---
 def start_focus_timer(minutes):
@@ -700,21 +707,27 @@ def update_face():
     """Update BMO's face state (blinking and image rotation)"""
     now = time.time()
     
-    # Rotate face every 2 minutes
-    if now - state["last_face_switch"] > 120:
+    # Rotate face every 45 seconds (increased frequency)
+    if now - state["last_face_switch"] > 45:
+        print("Rotating face image...")
         load_random_face()
     
-    # Blinking logic
+    # Blinking logic (decreased frequency: 8-20 seconds)
     if state["is_blinking"]:
         if now > state["blink_end_time"]:
             state["is_blinking"] = False
-            state["blink_timer"] = now + random.uniform(2.0, 6.0)
+            state["blink_timer"] = now + random.uniform(8.0, 20.0)
     else:
         if now > state["blink_timer"]:
             state["is_blinking"] = True
             state["blink_end_time"] = now + 0.15 # Blink duration
+            print("BMO Blink!")
+            sys.stdout.flush()
 
 def draw_face(screen):
+    # Always clear with a solid background first to avoid "ghosting" or leftover crosshairs
+    screen.fill(BLACK) 
+
     if state["is_blinking"]:
         target_surf = state["current_face_closed"]
     else:
@@ -723,8 +736,8 @@ def draw_face(screen):
     if target_surf:
         screen.blit(target_surf, (0, 0))
     else:
+        # Emergency Fallback
         screen.fill(TEAL)
-        # Deep Fallback
         pygame.draw.circle(screen, BLACK, (140, 120), 9)
         pygame.draw.circle(screen, BLACK, (340, 120), 9)
         pygame.draw.arc(screen, BLACK, (210, 140, 60, 40), 3.14, 6.28, 4)
@@ -1132,21 +1145,21 @@ def main():
             state["snake"].update()
             state["snake"].draw(screen)
         
-        # Crosshair Debug (show for 1 second after touch)
-        if "last_touch_pos" in state and "last_touch_pos_time" in state:
-            if time.time() - state["last_touch_pos_time"] < 1.0:
-                tx, ty = state["last_touch_pos"]
-                pygame.draw.line(screen, WHITE, (tx-10, ty), (tx+10, ty), 3)
-                pygame.draw.line(screen, WHITE, (tx, ty-10), (tx, ty+10), 3)
-                pygame.draw.line(screen, BLACK, (tx-10, ty), (tx+10, ty), 1)
-                pygame.draw.line(screen, BLACK, (tx, ty-10), (tx, ty+10), 1)
+        # Crosshair Debug (Removed to prevent face tint issues)
+        # if "last_touch_pos" in state and "last_touch_pos_time" in state:
+        #     if time.time() - state["last_touch_pos_time"] < 1.0:
+        #         ...
+        pass
         
         # Apply Software Brightness
         if state["brightness"] < 1.0:
-            dim_val = int(state["brightness"] * 255)
-            dim_surf = pygame.Surface((WIDTH, HEIGHT))
-            dim_surf.fill((dim_val, dim_val, dim_val))
-            screen.blit(dim_surf, (0, 0), special_flags=pygame.BLEND_MULT)
+            if state["cached_dim_surf"] is None or state["last_brightness"] != state["brightness"]:
+                dim_val = int(state["brightness"] * 255)
+                # Create dim surf with IDENTICAL format to avoid tint shifts
+                state["cached_dim_surf"] = pygame.Surface((WIDTH, HEIGHT), depth=16, masks=screen.get_masks())
+                state["cached_dim_surf"].fill((dim_val, dim_val, dim_val))
+                state["last_brightness"] = state["brightness"]
+            screen.blit(state["cached_dim_surf"], (0, 0), special_flags=pygame.BLEND_MULT)
         
         try:
             os.lseek(fb_fd, 0, os.SEEK_SET)
