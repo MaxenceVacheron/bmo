@@ -259,6 +259,12 @@ def draw_slideshow(screen):
         x = (WIDTH - surf.get_width()) // 2
         y = (HEIGHT - surf.get_height()) // 2
         screen.blit(surf, (x, y))
+    
+    # Navigation hints
+    hint_left = FONT_SMALL.render("<", False, WHITE)
+    hint_right = FONT_SMALL.render(">", False, WHITE)
+    screen.blit(hint_left, (10, HEIGHT - 30))
+    screen.blit(hint_right, (WIDTH - 30, HEIGHT - 30))
 
 # --- GIF PLAYER FUNCTIONS ---
 def start_gif_player(subdir):
@@ -360,6 +366,12 @@ def draw_gif(screen):
     x = (WIDTH - frame.get_width()) // 2
     y = (HEIGHT - frame.get_height()) // 2
     screen.blit(frame, (x, y))
+    
+    # Navigation hints
+    hint_left = FONT_SMALL.render("<", False, WHITE)
+    hint_right = FONT_SMALL.render(">", False, WHITE)
+    screen.blit(hint_left, (10, HEIGHT - 30))
+    screen.blit(hint_right, (WIDTH - 30, HEIGHT - 30))
 
 # --- TEXT VIEWER FUNCTIONS ---
 def start_text_viewer(subdir):
@@ -763,6 +775,39 @@ def main():
                     else:
                         # Cancel Timer?
                         state["mode"] = "MENU" # Or ask confirmation?
+                
+                
+                elif state["mode"] in ["SLIDESHOW", "GIF_PLAYER", "TEXT_VIEWER"]:
+                    # Touch navigation: Left = Previous, Center = Exit, Right = Next
+                    if x < WIDTH / 3:
+                        # LEFT: Previous
+                        if state["mode"] == "SLIDESHOW":
+                            imgs = state["slideshow"]["images"]
+                            if imgs and imgs[0] != "PLACEHOLDER_EMPTY":
+                                state["slideshow"]["index"] = (state["slideshow"]["index"] - 2) % len(imgs)
+                                state["slideshow"]["last_switch"] = 0  # Force immediate load
+                        elif state["mode"] == "GIF_PLAYER":
+                            gifs = state["gif_player"]["gifs"]
+                            if gifs:
+                                state["gif_player"]["current_gif_index"] = (state["gif_player"]["current_gif_index"] - 1) % len(gifs)
+                                state["gif_player"]["gif_switch_time"] = time.time()
+                                load_next_gif()
+                        # TEXT_VIEWER: no previous/next for now
+                    
+                    elif x > 2 * WIDTH / 3:
+                        # RIGHT: Next
+                        if state["mode"] == "SLIDESHOW":
+                            state["slideshow"]["last_switch"] = 0  # Force immediate switch
+                        elif state["mode"] == "GIF_PLAYER":
+                            gifs = state["gif_player"]["gifs"]
+                            if gifs:
+                                state["gif_player"]["current_gif_index"] = (state["gif_player"]["current_gif_index"] + 1) % len(gifs)
+                                state["gif_player"]["gif_switch_time"] = time.time()
+                                load_next_gif()
+                    
+                    else:
+                        # CENTER: Exit to menu
+                        state["mode"] = "MENU"
                 
                 else: 
                     state["mode"] = "MENU"
