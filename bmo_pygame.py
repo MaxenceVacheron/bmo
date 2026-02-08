@@ -77,14 +77,28 @@ MENUS = {
         {"label": "< BACK", "action": "BACK", "color": GRAY},
     ],
     "NEXTCLOUD": [
-        {"label": "PHOTOS", "action": "MENU:PHOTOS", "color": YELLOW},
-        {"label": "TEXTES", "action": "MENU:TEXTES", "color": GREEN},
+        {"label": "DEFAULT", "action": "MENU:NC_DEFAULT", "color": YELLOW},
+        {"label": "PERSO", "action": "MENU:NC_PERSO", "color": GREEN},
         {"label": "< BACK", "action": "BACK", "color": GRAY},
     ],
-    "PHOTOS": [
-        {"label": "GIFs", "action": "GIF:GIFs", "color": GREEN},
-        {"label": "PERSO", "action": "SLIDESHOW:Perso", "color": PINK},
-        {"label": "REMOTE", "action": "SLIDESHOW:Remote", "color": BLUE},
+    "NC_DEFAULT": [
+        {"label": "PHOTOS", "action": "MENU:DEFAULT_PHOTOS", "color": YELLOW},
+        {"label": "TEXTES", "action": "TEXT:default", "color": GREEN},
+        {"label": "< BACK", "action": "BACK", "color": GRAY},
+    ],
+    "NC_PERSO": [
+        {"label": "PHOTOS", "action": "MENU:PERSO_PHOTOS", "color": PINK},
+        {"label": "TEXTES", "action": "TEXT:perso", "color": BLUE},
+        {"label": "< BACK", "action": "BACK", "color": GRAY},
+    ],
+    "DEFAULT_PHOTOS": [
+        {"label": "GIFs", "action": "GIF:default", "color": GREEN},
+        {"label": "Images", "action": "SLIDESHOW:default", "color": YELLOW},
+        {"label": "< BACK", "action": "BACK", "color": GRAY},
+    ],
+    "PERSO_PHOTOS": [
+        {"label": "GIFs", "action": "GIF:perso", "color": GREEN},
+        {"label": "Images", "action": "SLIDESHOW:perso", "color": PINK},
         {"label": "< BACK", "action": "BACK", "color": GRAY},
     ],
     "TEXTES": [
@@ -177,7 +191,8 @@ def touch_thread():
 
 # --- SLIDESHOW FUNCTIONS ---
 def start_slideshow(subdir):
-    path = os.path.join(NEXTCLOUD_PATH, "Photos", subdir)
+    # subdir is 'default' or 'perso'
+    path = os.path.join(NEXTCLOUD_PATH, subdir, "Photos")
     state["slideshow"]["path"] = path
     state["slideshow"]["images"] = []
     
@@ -247,7 +262,8 @@ def draw_slideshow(screen):
 
 # --- GIF PLAYER FUNCTIONS ---
 def start_gif_player(subdir):
-    path = os.path.join(NEXTCLOUD_PATH, "Photos", subdir)
+    # subdir is 'default' or 'perso'
+    path = os.path.join(NEXTCLOUD_PATH, subdir, "Photos", "GIFs")
     state["gif_player"]["path"] = path
     state["gif_player"]["gifs"] = []
     
@@ -347,7 +363,8 @@ def draw_gif(screen):
 
 # --- TEXT VIEWER FUNCTIONS ---
 def start_text_viewer(subdir):
-    path = os.path.join(NEXTCLOUD_PATH, "Textes", subdir)
+    # subdir is 'default' or 'perso'
+    path = os.path.join(NEXTCLOUD_PATH, subdir, "Textes")
     found_file = None
     if os.path.exists(path):
         for f in os.listdir(path):
