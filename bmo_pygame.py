@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import socket
+import urllib.request
 import random
 import pygame
 import threading
@@ -100,6 +101,7 @@ MENUS = {
         {"label": "GAMES", "action": "MENU:GAMES", "color": YELLOW},
         {"label": "STATS", "action": "MODE:STATS", "color": YELLOW},
         {"label": "CLOCK", "action": "MODE:CLOCK", "color": BLUE},
+        {"label": "WEATHER", "action": "MODE:WEATHER", "color": BLUE},
         {"label": "SYSTEM", "action": "MODE:ADVANCED_STATS", "color": GRAY},
         {"label": "NOTES", "action": "MODE:NOTES", "color": RED},
         {"label": "HEART", "action": "MODE:HEART", "color": PINK},
@@ -239,7 +241,13 @@ state = {
     },
     "snake": None, # Will hold SnakeGame instance
     "cached_dim_surf": None,
-    "last_brightness": -1.0
+    "last_brightness": -1.0,
+    "weather": {
+        "temp": "--",
+        "desc": "Loading...",
+        "icon": "cloud",
+        "last_update": 0
+    }
 }
 
 # --- SYSTEM STATS ---
@@ -328,6 +336,65 @@ def draw_advanced_stats(screen):
     pygame.draw.rect(screen, BLACK, (40, y+30, 400, 20), 2)
     w = int(396 * (disk_p / 100.0))
     pygame.draw.rect(screen, BLUE, (42, y+32, w, 16))
+
+def get_weather():
+    """Fetch current weather from wttr.in"""
+    try:
+        url = "http://wttr.in/?format=j1"
+        with urllib.request.urlopen(url, timeout=5) as response:
+            data = json.loads(response.read().decode())
+            current = data['current_condition'][0]
+            temp = current['temp_C']
+            desc = current['weatherDesc'][0]['value']
+            # Map description to icons
+            desc_lower = desc.lower()
+            icon = "cloud"
+            if "sun" in desc_lower or "clear" in desc_lower: icon = "sun"
+            elif "rain" in desc_lower or "drizzle" in desc_lower: icon = "rain"
+            elif "snow" in desc_lower: icon = "snow"
+            elif "storm" in desc_lower or "thunder" in desc_lower: icon = "storm"
+            
+            state["weather"] = {
+                "temp": f"{temp}C",
+                "desc": desc,
+                "icon": icon,
+                "last_update": time.time()
+            }
+            state["needs_redraw"] = True
+            print(f"Weather updated: {temp}C, {desc}")
+    except Exception as e:
+        print(f"Error fetching weather: {e}")
+
+def draw_weather(screen):
+    screen.fill(TEAL) # Nice teal background for weather
+    now = time.time()
+    
+    # Auto-refresh every 20 mins
+    if now - state["weather"]["last_update"] > 1200:
+        threading.Thread(target=get_weather, daemon=True).start()
+    
+    # Draw Background pattern (simple clouds or sun rays)
+    # Icon
+    icon_name = state["weather"]["icon"]
+    icon_path = f"/home/pi/bmo/bmo_assets/weather/{icon_name}.png"
+    if os.path.exists(icon_path):
+        try:
+            img = Image.open(icon_path).convert('RGBA')
+            img = img.resize((150, 150), Image.Resampling.LANCZOS)
+            data = img.tobytes()
+            pygame_img = pygame.image.fromstring(data, img.size, img.mode)
+            screen.blit(pygame_img, (WIDTH//2 - 75, 40))
+        except:
+            pass
+            
+    # Temp
+    temp_lbl = FONT_LARGE.render(state["weather"]["temp"], False, BLACK)
+    screen.blit(temp_lbl, (WIDTH//2 - temp_lbl.get_width()//2, 200))
+    
+    # Description
+    desc = state["weather"]["desc"]
+    desc_lbl = FONT_SMALL.render(desc, False, BLACK)
+    screen.blit(desc_lbl, (WIDTH//2 - desc_lbl.get_width()//2, 270))
 
 # --- TOUCH INPUT THREAD ---
 def touch_thread():
@@ -1361,6 +1428,8 @@ def main():
                 draw_focus_face(screen)
             elif state["mode"] == "FACE": 
                 draw_face(screen)
+            elif state["mode"] == "WEATHER":
+                draw_weather(screen)
             elif state["mode"] == "ADVANCED_STATS":
                 draw_advanced_stats(screen)
             elif state["mode"] == "MENU": draw_menu(screen)
