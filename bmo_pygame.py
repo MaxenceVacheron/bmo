@@ -1,12 +1,14 @@
 import os
 import sys
 import time
+import socket
 import random
 import pygame
 import threading
 import math
 from evdev import InputDevice, ecodes
 from PIL import Image
+from games.snake import SnakeGame
 
 # --- CONFIGURATION ---
 WIDTH, HEIGHT = 480, 320
@@ -68,6 +70,19 @@ MENUS = {
         {"label": "CLOCK", "action": "MODE:CLOCK", "color": BLUE},
         {"label": "NOTES", "action": "MODE:NOTES", "color": RED},
         {"label": "HEART", "action": "MODE:HEART", "color": PINK},
+        {"label": "SETTINGS", "action": "MENU:SETTINGS", "color": GRAY},
+        {"label": "GAMES", "action": "MENU:GAMES", "color": YELLOW},
+    ],
+    "GAMES": [
+        {"label": "SNAKE", "action": "MODE:SNAKE", "color": GREEN},
+        {"label": "< BACK", "action": "BACK", "color": GRAY},
+    ],
+    "SETTINGS": [
+        {"label": "BRIGHTNESS: 25%", "action": "BRIGHTNESS:0.25", "color": TEAL},
+        {"label": "BRIGHTNESS: 50%", "action": "BRIGHTNESS:0.50", "color": TEAL},
+        {"label": "BRIGHTNESS: 75%", "action": "BRIGHTNESS:0.75", "color": TEAL},
+        {"label": "BRIGHTNESS: 100%", "action": "BRIGHTNESS:1.0", "color": TEAL},
+        {"label": "< BACK", "action": "BACK", "color": GRAY},
     ],
     "FOCUS": [
         {"label": "15 MIN", "action": "FOCUS:15", "color": GREEN},
@@ -110,12 +125,16 @@ MENUS = {
 
 # State
 state = {
-    "mode": "STARTUP", # Start with startup animation
+    "mode": "STARTUP", # Back to startup for Agnès
     "expression": "happy",
     "last_interaction": 0,
     "love_note": "You are amazing!",
     "menu_stack": ["MAIN"],
     "menu_page": 0,
+    "brightness": 1.0, # 1.0 = Max, 0.0 = Black
+    "blink_timer": 0, # Time until next blink
+    "is_blinking": False,
+    "blink_end_time": 0,
     "startup": {
         "message": "Hello Agnès! I'm BMO. Maxence built my brain just for you.",
         "char_index": 0,
@@ -153,7 +172,8 @@ state = {
         "last_touch_time": 0,
         "next_frames": [],  # Preloaded next GIF
         "next_frame_duration": 0.1
-    }
+    },
+    "snake": None  # Will hold SnakeGame instance
 }
 
 # --- SYSTEM STATS ---
@@ -477,12 +497,15 @@ def update_startup():
     if target_chars > len(state["startup"]["message"]):
         # Animation complete, wait 2 seconds then go to FACE
         if elapsed > len(state["startup"]["message"]) * state["startup"]["char_delay"] + 2.0:
+            print("Startup complete, moving to FACE")
             state["mode"] = "FACE"
     else:
-        state["startup"]["char_index"] = target_chars
+        if target_chars != state["startup"]["char_index"]:
+            state["startup"]["char_index"] = target_chars
+            print(f"Startup progress: {state['startup']['char_index']}/{len(state['startup']['message'])}")
 
 def draw_startup(screen):
-    screen.fill(TEAL)
+    screen.fill(BLACK) # Using BLACK for startup contrast
     
     # Draw partial message (typewriter effect)
     message = state["startup"]["message"]
@@ -503,16 +526,18 @@ def draw_startup(screen):
     # Draw lines
     y = HEIGHT // 2 - (len(lines) * 30) // 2
     for l in lines:
-        surf = FONT_MEDIUM.render(l, False, BLACK)
-        screen.blit(surf, (WIDTH//2 - surf.get_width()//2, y))
+        if l.strip():
+            surf = FONT_MEDIUM.render(l, False, WHITE) # WHITE text on BLACK
+            screen.blit(surf, (WIDTH//2 - surf.get_width()//2, y))
         y += 30
     
     # Blinking cursor
     if state["startup"]["char_index"] < len(message):
         if int(time.time() * 2) % 2 == 0:  # Blink every 0.5s
-            cursor = FONT_MEDIUM.render("_", False, BLACK)
+            cursor = FONT_MEDIUM.render("_", False, WHITE)
             # Position cursor at end of last line
-            last_line_surf = FONT_MEDIUM.render(lines[-1], False, BLACK)
+            last_line_content = lines[-1] if lines else ""
+            last_line_surf = FONT_MEDIUM.render(last_line_content, False, WHITE)
             cursor_x = WIDTH//2 - last_line_surf.get_width()//2 + last_line_surf.get_width()
             cursor_y = y - 30
             screen.blit(cursor, (cursor_x, cursor_y))
@@ -587,10 +612,29 @@ def draw_focus_face(screen):
 
 
 # --- COMMON DRAWING ---
+def update_face():
+    """Update BMO's face state (blinking)"""
+    now = time.time()
+    if state["is_blinking"]:
+        if now > state["blink_end_time"]:
+            state["is_blinking"] = False
+            state["blink_timer"] = now + random.uniform(2.0, 6.0)
+    else:
+        if now > state["blink_timer"]:
+            state["is_blinking"] = True
+            state["blink_end_time"] = now + 0.15 # Blink duration
+
 def draw_face(screen):
     screen.fill(TEAL)
-    pygame.draw.circle(screen, BLACK, (140, 120), 15)
-    pygame.draw.circle(screen, BLACK, (340, 120), 15)
+    
+    if state["is_blinking"]:
+        # Draw closed eyes
+        pygame.draw.line(screen, BLACK, (125, 120), (155, 120), 5)
+        pygame.draw.line(screen, BLACK, (325, 120), (355, 120), 5)
+    else:
+        # Draw open eyes
+        pygame.draw.circle(screen, BLACK, (140, 120), 15)
+        pygame.draw.circle(screen, BLACK, (340, 120), 15)
     
     if state["expression"] == "happy":
         pygame.draw.arc(screen, BLACK, (190, 170, 100, 50), 3.14, 6.28, 4)
@@ -776,27 +820,21 @@ def draw_focus_face(screen):
     pygame.draw.rect(screen, GREEN, (41, 301, int(398 * progress), 8))
 
 def main():
+    # singleton check
+    try:
+        lock_socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+        lock_socket.bind('\0bmo_instance_lock')
+    except socket.error:
+        print("BMO is already running!")
+        sys.exit(0)
+
     t = threading.Thread(target=touch_thread, daemon=True)
     t.start()
     clock = pygame.time.Clock()
     fb_fd = os.open(FB_DEVICE, os.O_RDWR)
     
     start_time = time.time()
-    while time.time() - start_time < 2.0:
-        screen.fill(TEAL)
-        pygame.draw.circle(screen, BLACK, (140, 120), 15)
-        pygame.draw.circle(screen, BLACK, (340, 120), 15)
-        pygame.draw.arc(screen, BLACK, (200, 180, 80, 40), 3.14, 6.28, 5)
-        t_bounce = (time.time() - start_time) * 8
-        offset = int(math.sin(t_bounce) * 10)
-        lbl = FONT_LARGE.render("HELLO!", False, BLACK)
-        screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, 40 + offset))
-        try:
-            os.lseek(fb_fd, 0, os.SEEK_SET)
-            os.write(fb_fd, screen.get_buffer())
-        except: pass
-        clock.tick(30)
-
+    # Removed old splash loop
     running = True
     while running:
         for event in pygame.event.get():
@@ -808,7 +846,9 @@ def main():
                 state["last_touch_pos_time"] = time.time()
                 state["last_interaction"] = time.time()
                 
-                if state["mode"] == "FACE":
+                if state["mode"] == "STARTUP":
+                    state["mode"] = "FACE"
+                elif state["mode"] == "FACE":
                     state["mode"] = "MENU"
                     state["menu_stack"] = ["MAIN"]
                     state["menu_page"] = 0 # Reset page when entering menu
@@ -857,6 +897,7 @@ def main():
                             state["mode"] = action.split(":")[1]
                             state["menu_page"] = 0
                             if state["mode"] == "NOTES": state["love_note"] = random.choice(LOVE_NOTES)
+                            if state["mode"] == "SNAKE": state["snake"] = None # Reset game
                         elif action.startswith("SLIDESHOW:"):
                             start_slideshow(action.split(":")[1])
                         elif action.startswith("GIF:"):
@@ -866,6 +907,8 @@ def main():
                         elif action.startswith("FOCUS:"):
                             mins = int(action.split(":")[1])
                             start_focus_timer(mins)
+                        elif action.startswith("BRIGHTNESS:"):
+                            state["brightness"] = float(action.split(":")[1])
                 
                 elif state["mode"] == "FOCUS":
                     # If active, ignore touches? Or allow double tap to cancel?
@@ -917,6 +960,13 @@ def main():
                         # CENTER: Exit to menu
                         state["mode"] = "MENU"
                 
+                elif state["mode"] == "SNAKE":
+                    if state["snake"]:
+                        if state["snake"].game_over:
+                            state["mode"] = "MENU"
+                        else:
+                            state["snake"].handle_input((x, y))
+                
                 else: 
                     state["mode"] = "MENU"
         
@@ -934,12 +984,19 @@ def main():
             draw_text_viewer(screen)
         elif state["mode"] == "FOCUS":
             draw_focus_face(screen) # New Draw Function
-        elif state["mode"] == "FACE": draw_face(screen)
+        elif state["mode"] == "FACE": 
+            update_face()
+            draw_face(screen)
         elif state["mode"] == "MENU": draw_menu(screen)
         elif state["mode"] == "STATS": draw_stats(screen)
         elif state["mode"] == "CLOCK": draw_clock(screen)
         elif state["mode"] == "NOTES": draw_notes(screen)
         elif state["mode"] == "HEART": draw_heart(screen)
+        elif state["mode"] == "SNAKE":
+            if state["snake"] is None:
+                state["snake"] = SnakeGame(WIDTH, HEIGHT)
+            state["snake"].update()
+            state["snake"].draw(screen)
         
         # Crosshair Debug (show for 1 second after touch)
         if "last_touch_pos" in state and "last_touch_pos_time" in state:
@@ -949,6 +1006,14 @@ def main():
                 pygame.draw.line(screen, WHITE, (tx, ty-10), (tx, ty+10), 3)
                 pygame.draw.line(screen, BLACK, (tx-10, ty), (tx+10, ty), 1)
                 pygame.draw.line(screen, BLACK, (tx, ty-10), (tx, ty+10), 1)
+        
+        # Apply Software Brightness
+        if state["brightness"] < 1.0:
+            # Using BLEND_MULT preserves color ratios better than alpha blending
+            dim_val = int(state["brightness"] * 255)
+            dim_surf = pygame.Surface((WIDTH, HEIGHT))
+            dim_surf.fill((dim_val, dim_val, dim_val))
+            screen.blit(dim_surf, (0, 0), special_flags=pygame.BLEND_MULT)
         
         try:
             os.lseek(fb_fd, 0, os.SEEK_SET)
