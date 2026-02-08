@@ -298,6 +298,25 @@ def get_disk_usage():
     except:
         return 0, 0
 
+def get_ram_usage():
+    """Get RAM usage percentage and free GB"""
+    try:
+        with open('/proc/meminfo', 'r') as f:
+            lines = f.readlines()
+        total = 0
+        free = 0
+        for line in lines:
+            if "MemTotal" in line:
+                total = int(line.split()[1])
+            if "MemAvailable" in line:
+                free = int(line.split()[1])
+        used = total - free
+        p = (used / total) * 100
+        f_gb = free / 1024.0 / 1024.0
+        return p, f_gb
+    except:
+        return 0, 0
+
 def get_wifi_strength():
     """Get Wi-Fi signal strength (percentage)"""
     try:
@@ -341,6 +360,14 @@ def draw_advanced_stats(screen):
     w = int(396 * (min(temp, 85) / 85.0))
     color = RED if temp > 65 else GREEN
     pygame.draw.rect(screen, color, (42, y+32, w, 16))
+    
+    y += 70
+    ram_p, ram_f = get_ram_usage()
+    lbl = FONT_SMALL.render(f"RAM: {ram_p:.1f}% ({ram_f:.1f} GB Free)", False, BLACK)
+    screen.blit(lbl, (40, y))
+    pygame.draw.rect(screen, BLACK, (40, y+30, 400, 20), 2)
+    w = int(396 * (ram_p / 100.0))
+    pygame.draw.rect(screen, ORANGE, (42, y+32, w, 16))
     
     y += 70
     disk_p, disk_f = get_disk_usage()
@@ -1145,28 +1172,20 @@ def draw_face(screen):
         pygame.draw.polygon(screen, PINK, [(int(hx-9), int(hy+2)), (int(hx+9), int(hy+2)), (int(hx), int(hy+10))])
 
 def draw_click_crosshair(screen):
-    """Draw a visual crosshair feedback at the last click position"""
+    """Draw a simple visual crosshair feedback at the last click position"""
     now = time.time()
     diff = now - state["click_feedback"]["time"]
     if diff < 1.0:
         x, y = state["click_feedback"]["pos"]
-        # Fade out effect
         alpha = int(255 * (1.0 - diff))
-        # Use a temporary surface for alpha crosshair
-        cross_surf = pygame.Surface((40, 40), pygame.SRCALPHA)
+        cross_surf = pygame.Surface((30, 30), pygame.SRCALPHA)
         color = (255, 255, 255, alpha)
-        # Draw circle
-        pygame.draw.circle(cross_surf, color, (20, 20), 10, 2)
-        # Draw cross lines
-        pygame.draw.line(cross_surf, color, (20, 5), (20, 15), 2)
-        pygame.draw.line(cross_surf, color, (20, 25), (20, 35), 2)
-        pygame.draw.line(cross_surf, color, (int(WIDTH/2-15+x-x), 20), (int(WIDTH/2-5+x-x), 20), 2) # Just kidding on the math
-        # Real lines:
-        pygame.draw.line(cross_surf, color, (5, 20), (15, 20), 2)
-        pygame.draw.line(cross_surf, color, (25, 20), (35, 20), 2)
         
-        screen.blit(cross_surf, (x - 20, y - 20))
-        # Keep redraw active during the 1s window
+        # Simple cross: horizontal and vertical lines
+        pygame.draw.line(cross_surf, color, (0, 15), (30, 15), 2)
+        pygame.draw.line(cross_surf, color, (15, 0), (15, 30), 2)
+        
+        screen.blit(cross_surf, (x - 15, y - 15))
         state["needs_redraw"] = True
 
 def draw_menu(screen):
@@ -1560,7 +1579,7 @@ def main():
         
         # --- UPDATE PHASE ---
         now = time.time()
-        always_update = state["mode"] in ["SNAKE", "GIF_PLAYER", "STARTUP", "SLIDESHOW", "CLOCK"]
+        always_update = state["mode"] in ["SNAKE", "GIF_PLAYER", "STARTUP", "SLIDESHOW", "CLOCK", "ADVANCED_STATS"]
         
         # Inactivity Check
         if state["mode"] in ["MENU", "STATS", "CLOCK", "NOTES", "HEART", "SETTINGS", "GAMES"]:
