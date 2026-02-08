@@ -545,7 +545,10 @@ def update_startup():
         # Animation complete, wait 2 seconds then go to default mode
         if elapsed > len(state["startup"]["message"]) * state["startup"]["char_delay"] + 2.0:
             print(f"Startup complete, moving to {state['default_mode']}")
-            state["mode"] = state["default_mode"]
+            if state["default_mode"] == "FACE":
+                switch_to_face_mode()
+            else:
+                state["mode"] = state["default_mode"]
     else:
         if target_chars != state["startup"]["char_index"]:
             state["startup"]["char_index"] = target_chars
@@ -590,18 +593,31 @@ def draw_startup(screen):
             cursor_y = y - 30
             screen.blit(cursor, (cursor_x, cursor_y))
 
+def switch_to_face_mode(emotion="positive"):
+    """Switch to FACE mode and force an emotion (default: positive)"""
+    state["mode"] = "FACE"
+    load_random_face(emotion=emotion)
+
 # --- FACE IMAGE MANAGEMENT ---
-def load_random_face():
-    """Load a random face pair (open/closed) from the current emotion directory"""
-    emotion = state.get("emotion", "positive")
+def load_random_face(emotion=None):
+    """Load a random face pair. If emotion is None, uses 20% negative chance."""
+    
+    # 20% chance for negative if not forced
+    if emotion is None:
+        emotion = "negative" if random.random() < 0.2 else "positive"
+    
+    # Check if target emotion directory has images, fallback if needed
     open_dir = os.path.join(BMO_FACES_ROOT, emotion, "open")
+    if not os.path.exists(open_dir) or not [f for f in os.listdir(open_dir) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]:
+        emotion = "positive" # Fallback to positive
+        open_dir = os.path.join(BMO_FACES_ROOT, "positive", "open")
+
+    state["emotion"] = emotion
     closed_dir = os.path.join(BMO_FACES_ROOT, emotion, "closed")
     
-    # Always refresh list when switching emotions or if empty
-    state["face_images"] = []
-    if os.path.exists(open_dir):
-        state["face_images"] = [f for f in os.listdir(open_dir) 
-                               if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+    # Always refresh list
+    state["face_images"] = [f for f in os.listdir(open_dir) 
+                           if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
     
     if state["face_images"]:
         try:
@@ -614,8 +630,6 @@ def load_random_face():
                 if not os.path.exists(path): return None
                 img = Image.open(path).convert('RGB')
                 img = img.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
-            
-            # Convert to Pygame
                 data = img.tobytes()
                 pygame_img = pygame.image.fromstring(data, img.size, img.mode)
                 
@@ -971,7 +985,7 @@ def main():
                     continue # Ignore this touch for the underlying mode
                 
                 if state["mode"] == "STARTUP":
-                    state["mode"] = "FACE"
+                    switch_to_face_mode()
                 elif state["mode"] == "FACE":
                     state["mode"] = "MENU"
                     state["menu_stack"] = ["MAIN"]
@@ -1013,7 +1027,7 @@ def main():
                         if action == "BACK":
                             state["menu_stack"].pop()
                             state["menu_page"] = 0 # Reset page when going back
-                            if not state["menu_stack"]: state["mode"] = "FACE"
+                            if not state["menu_stack"]: switch_to_face_mode()
                         elif action.startswith("MENU:"):
                             state["menu_stack"].append(action.split(":")[1])
                             state["menu_page"] = 0 # Reset page for new menu
@@ -1049,7 +1063,7 @@ def main():
                     # But if Timer Ended: Return to Face
                     remaining = state["focus"]["end_time"] - time.time()
                     if remaining <= 0:
-                        state["mode"] = "FACE"
+                        switch_to_face_mode()
                     else:
                         # Cancel Timer?
                         state["mode"] = "MENU" # Or ask confirmation?
@@ -1108,7 +1122,7 @@ def main():
         if state["mode"] in ["MENU", "STATS", "CLOCK", "NOTES", "HEART", "SETTINGS", "GAMES"]:
             if time.time() - state["last_interaction"] > 20:
                 print("Inactivity timeout: Returning to FACE")
-                state["mode"] = "FACE"
+                switch_to_face_mode()
 
         # --- POP-UP FACE CHECK ---
         now = time.time()
