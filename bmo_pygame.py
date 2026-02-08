@@ -107,7 +107,6 @@ MENUS = {
     ],
     "GAMES": [
         {"label": "SNAKE", "action": "MODE:SNAKE", "color": GREEN},
-        {"label": "DRAWING LAB", "action": "MODE:DRAW", "color": PINK},
         {"label": "< BACK", "action": "BACK", "color": GRAY},
     ],
     "SETTINGS": [
@@ -239,12 +238,6 @@ state = {
         "next_frame_duration": 0.1
     },
     "snake": None, # Will hold SnakeGame instance
-    "drawing": {
-        "canvas": None, # Surface to hold the drawing
-        "last_pos": None,
-        "color": BLACK,
-        "thickness": 4
-    },
     "cached_dim_surf": None,
     "last_brightness": -1.0
 }
@@ -335,26 +328,6 @@ def draw_advanced_stats(screen):
     pygame.draw.rect(screen, BLACK, (40, y+30, 400, 20), 2)
     w = int(396 * (disk_p / 100.0))
     pygame.draw.rect(screen, BLUE, (42, y+32, w, 16))
-
-def draw_drawing_lab(screen):
-    # Initialize canvas if needed
-    if state["drawing"]["canvas"] is None:
-        state["drawing"]["canvas"] = pygame.Surface((WIDTH, HEIGHT), depth=16, masks=screen.get_masks())
-        state["drawing"]["canvas"].fill(WHITE)
-    
-    # Draw canvas
-    screen.blit(state["drawing"]["canvas"], (0, 0))
-    
-    # Draw Clear Button at top right
-    # Button is small to not interfere too much with drawing
-    clear_rect = (WIDTH - 80, 10, 70, 30)
-    pygame.draw.rect(screen, RED, clear_rect, border_radius=5)
-    lbl = FONT_SMALL.render("CLEAR", False, WHITE)
-    screen.blit(lbl, (clear_rect[0] + (clear_rect[2] - lbl.get_width())//2, clear_rect[1] + 5))
-    
-    # Back instruction
-    back_lbl = FONT_SMALL.render("Center tap to Exit", False, GRAY)
-    screen.blit(back_lbl, (10, HEIGHT - 25))
 
 # --- TOUCH INPUT THREAD ---
 def touch_thread():
@@ -1188,21 +1161,6 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            elif event.type == pygame.MOUSEMOTION:
-                if state["mode"] == "DRAW":
-                    x, y = event.pos
-                    if state["drawing"]["last_pos"]:
-                        # Draw onto persistent canvas
-                        pygame.draw.line(state["drawing"]["canvas"], 
-                                         state["drawing"]["color"], 
-                                         state["drawing"]["last_pos"], 
-                                         (x, y), 
-                                         state["drawing"]["thickness"])
-                        state["drawing"]["last_pos"] = (x, y)
-                        state["needs_redraw"] = True
-            elif event.type == pygame.MOUSEBUTTONUP:
-                if state["mode"] == "DRAW":
-                    state["drawing"]["last_pos"] = None
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = event.pos
                 state["last_touch_pos"] = (x, y)
@@ -1219,19 +1177,6 @@ def main():
                 state["needs_redraw"] = True
                 if state["mode"] == "STARTUP":
                     switch_to_face_mode()
-                elif state["mode"] == "DRAW":
-                    # Check for Clear button
-                    if x > WIDTH - 80 and y < 45:
-                        state["drawing"]["canvas"].fill(WHITE)
-                        state["needs_redraw"] = True
-                    else:
-                        # Center tap to exit
-                        if WIDTH/3 < x < 2*WIDTH/3 and HEIGHT/3 < y < 2*HEIGHT/3:
-                            state["mode"] = "MENU"
-                            state["needs_redraw"] = True
-                        else:
-                            # Start new line
-                            state["drawing"]["last_pos"] = (x, y)
                 elif state["mode"] == "FACE":
                     state["mode"] = "MENU"
                     state["menu_stack"] = ["MAIN"]
@@ -1423,8 +1368,6 @@ def main():
             elif state["mode"] == "CLOCK": draw_clock(screen)
             elif state["mode"] == "NOTES": draw_notes(screen)
             elif state["mode"] == "HEART": draw_heart(screen)
-            elif state["mode"] == "DRAW":
-                draw_drawing_lab(screen)
             elif state["mode"] == "SNAKE":
                 state["snake"].draw(screen)
 
