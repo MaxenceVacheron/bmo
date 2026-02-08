@@ -180,6 +180,7 @@ state = {
     "current_face_open": None,
     "current_face_closed": None,
     "last_face_switch": 0,
+    "needs_redraw": True,
     "startup": {
         "message": "Hello Agnès! I'm BMO. Maxence built my brain just for you.",
         "char_index": 0,
@@ -649,6 +650,7 @@ def load_random_face(emotion=None):
                 print(f"Loaded {emotion} face: {filename} (with blink version)")
                 
             state["last_face_switch"] = time.time()
+            state["needs_redraw"] = True
             sys.stdout.flush()
         except Exception as e:
             print(f"Error loading face images: {e}")
@@ -738,10 +740,12 @@ def update_face():
         if now > state["blink_end_time"]:
             state["is_blinking"] = False
             state["blink_timer"] = now + random.uniform(8.0, 20.0)
+            state["needs_redraw"] = True
     else:
         if now > state["blink_timer"]:
             state["is_blinking"] = True
             state["blink_end_time"] = now + 0.15 # Blink duration
+            state["needs_redraw"] = True
             print("BMO Blink!")
             sys.stdout.flush()
 
@@ -982,8 +986,10 @@ def main():
                 if state["is_showing_pop_face"]:
                     state["is_showing_pop_face"] = False
                     state["pop_face_timer"] = time.time() + random.uniform(50, 70)
+                    state["needs_redraw"] = True
                     continue # Ignore this touch for the underlying mode
                 
+                state["needs_redraw"] = True
                 if state["mode"] == "STARTUP":
                     switch_to_face_mode()
                 elif state["mode"] == "FACE":
@@ -1130,6 +1136,7 @@ def main():
             if now > state["pop_face_timer"]:
                 state["is_showing_pop_face"] = True
                 state["pop_face_end_time"] = now + 5.0
+                state["needs_redraw"] = True
                 load_random_face() # New face for the pop-up!
         
         # --- UPDATE & DRAW ---
@@ -1139,6 +1146,7 @@ def main():
             if now > state["pop_face_end_time"]:
                 state["is_showing_pop_face"] = False
                 state["pop_face_timer"] = now + random.uniform(50, 70)
+                state["needs_redraw"] = True
         elif state["mode"] == "STARTUP":
             update_startup()
             draw_startup(screen)
@@ -1180,15 +1188,21 @@ def main():
                 state["cached_dim_surf"] = pygame.Surface((WIDTH, HEIGHT), depth=16, masks=screen.get_masks())
                 state["cached_dim_surf"].fill((dim_val, dim_val, dim_val))
                 state["last_brightness"] = state["brightness"]
+                state["needs_redraw"] = True
             screen.blit(state["cached_dim_surf"], (0, 0), special_flags=pygame.BLEND_MULT)
         
-        try:
-            os.lseek(fb_fd, 0, os.SEEK_SET)
-            os.write(fb_fd, screen.get_buffer())
-        except Exception as e:
-            print(f"Framebuffer Write Error: {e}")
-            sys.stdout.flush()
-            sys.exit(1)
+        # --- FRAMEBUFFER WRITE ---
+        # Only write if something changed or we are in a mode that needs constant updates (Snake, GIF, Startup)
+        always_update = state["mode"] in ["SNAKE", "GIF_PLAYER", "STARTUP", "SLIDESHOW", "CLOCK"]
+        if state["needs_redraw"] or always_update:
+            try:
+                os.lseek(fb_fd, 0, os.SEEK_SET)
+                os.write(fb_fd, screen.get_buffer())
+                state["needs_redraw"] = False
+            except Exception as e:
+                print(f"Framebuffer Write Error: {e}")
+                sys.stdout.flush()
+                sys.exit(1)
             
         clock.tick(30)
         
