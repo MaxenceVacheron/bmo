@@ -192,8 +192,8 @@ def update_slideshow():
             img_path = imgs[state["slideshow"]["index"]]
             img = pygame.image.load(img_path)
             
-            # Convert to match screen format (RGB565 with correct masks)
-            img = img.convert(depth=16, masks=(0xF800, 0x07E0, 0x001F, 0))
+            # Convert to standard RGB (let Pygame handle framebuffer conversion)
+            img = img.convert()
             
             img_rect = img.get_rect()
             scale = min(WIDTH / img_rect.width, HEIGHT / img_rect.height)
