@@ -1,0 +1,24 @@
+[Unit]
+Description=RClone Mount Service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=notify
+Environment=RCLONE_CONFIG=/home/pi/.config/rclone/rclone.conf
+ExecStart=/usr/bin/rclone mount NextCloud: /home/pi/mnt/nextcloud \
+--allow-other \
+--dir-cache-time 1h \
+--poll-interval 1m \
+--vfs-cache-mode full \
+--vfs-cache-max-size 1G \
+--vfs-cache-max-age 24h \
+--umask 002
+ExecStop=/bin/fusermount -u /home/pi/mnt/nextcloud
+Restart=always
+RestartSec=60
+User=pi
+Group=pi
+
+[Install]
+WantedBy=multi-user.target
