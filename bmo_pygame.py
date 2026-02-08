@@ -23,7 +23,7 @@ CONFIG_FILE = "/home/pi/bmo/bmo_config.json"
 BMO_FACES_ROOT = "/home/pi/bmo/bmo_faces"
 IDLE_THOUGHT_DIR = "/home/pi/bmo/bmo_assets/idle/thought"
 MESSAGES_FILE = "/home/pi/bmo/messages.json"
-MESSAGES_URL = "http://bmo.pg.maxencevacheron.fr"
+MESSAGES_URL = "https://bmo.pg.maxencevacheron.fr"
 
 def load_config():
     """Load configuration from file"""
@@ -309,6 +309,7 @@ def fetch_remote_messages():
     while True:
         try:
             print("✉️ Fetching messages...")
+            sys.stdout.flush()
             with urllib.request.urlopen(MESSAGES_URL, timeout=10) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode())
@@ -329,8 +330,10 @@ def fetch_remote_messages():
                         save_messages()
                         state["needs_redraw"] = True
                         print(f"📩 Received {len(new_msgs)} messages!")
+                        sys.stdout.flush()
         except Exception as e:
             print(f"Error fetching messages: {e}")
+            sys.stdout.flush()
         
         # Poll every 5 minutes
         time.sleep(300)
