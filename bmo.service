@@ -4,10 +4,11 @@ After=network.target
 
 [Service]
 ExecStartPre=-/usr/bin/git -C /home/pi/bmo pull origin main
-ExecStart=/usr/bin/python3 -m bmo_project.main
+ExecStart=/usr/bin/python3 -u -m bmo_project.main
 WorkingDirectory=/home/pi/bmo
 StandardOutput=inherit
 StandardError=inherit
+Environment=PYTHONUNBUFFERED=1
 Restart=always
 User=root
 

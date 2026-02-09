@@ -85,7 +85,7 @@ def download_font_if_missing():
     """Download default font to ensure consistent look"""
     if not os.path.exists(FONT_FILE):
         print("📥 Downloading font for consistent UI...")
-        url = "https://raw.githubusercontent.com/dejavu-fonts/dejavu-fonts/master/ttf/DejaVuSans-Bold.ttf"
+        url = "https://github.com/dejavu-fonts/dejavu-fonts/blob/master/ttf/DejaVuSans-Bold.ttf?raw=true"
         try:
             urllib.request.urlretrieve(url, FONT_FILE)
             print("✅ Font downloaded.")

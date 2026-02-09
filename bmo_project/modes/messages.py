@@ -19,16 +19,19 @@ T9_KEYS = {
     pygame.K_0: " 0",
 }
 
-# Key coordinates for touch UI (approximate grid)
-# 1 2 3
-# 4 5 6
-# 7 8 9
-# * 0 #
+# Key coordinates for touch UI (Horizontal 480x320)
+# Input field: (10, 5, 460, 60)
+# Keys area starts at Y=75
+# 3 cols, 4 rows.
+# Keys size: 100x50. Gap: 10.
+# X start: 90 ( (480 - (3*100 + 2*10)) / 2 = (480-320)/2 = 80 ) -> Let's use 85.
+# X: 85, 195, 305
+# Y: 75, 135, 195, 255
 KEYS_LAYOUT = [
-    ("1", ".,?!", (50, 180)), ("2", "ABC", (160, 180)), ("3", "DEF", (270, 180)),
-    ("4", "GHI", (50, 220)), ("5", "JKL", (160, 220)), ("6", "MNO", (270, 220)),
-    ("7", "PQRS", (50, 260)), ("8", "TUV", (160, 260)), ("9", "WXYZ", (270, 260)),
-    ("*", "DEL", (50, 300)), ("0", "_", (160, 300)), ("#", "SEND", (270, 300))
+    ("1", ".,?!", (85, 75)), ("2", "ABC", (195, 75)), ("3", "DEF", (305, 75)),
+    ("4", "GHI", (85, 135)), ("5", "JKL", (195, 135)), ("6", "MNO", (305, 135)),
+    ("7", "PQRS", (85, 195)), ("8", "TUV", (195, 195)), ("9", "WXYZ", (305, 195)),
+    ("*", "DEL", (85, 255)), ("0", "_", (195, 255)), ("#", "SEND", (305, 255))
 ]
 
 class T9Keyboard:
@@ -66,15 +69,17 @@ class T9Keyboard:
     def handle_touch(self, pos):
         # Map touch to keys
         x, y = pos
-        # Simple grid collision detection
-        # Logic to match KEYS_LAYOUT positions
-        # Assuming button size ~80x35
-        w, h = 80, 35
+        # New key size
+        w, h = 100, 50
         
         for k, label, (kx, ky) in KEYS_LAYOUT:
             if kx <= x <= kx + w and ky <= y <= ky + h:
-                self.process_key(k)
-                return
+                return self.process_key(k)
+        
+        # Handle CANCEL/EXIT if touching top left (outside input)?
+        # Let's keep specific exit logic in main handler for now, or return trigger here
+        if y < 70 and x > 440: # Top right corner cancel
+             return "CANCEL"
 
     def process_key(self, k):
         if k in "1234567890":
@@ -105,21 +110,26 @@ class T9Keyboard:
             self.text = self.text[:-1]
         elif k == "#": # SEND
             if self.text:
-                network.send_message(self.recipient, self.text)
+                network.send_message(self.recipient, self.text.strip())
                 self.text = "" # Clear after send
                 return "SENT"
 
     def draw(self, screen):
-        # Draw Input Field
-        pygame.draw.rect(screen, (255, 255, 255), (20, 20, 440, 140))
-        pygame.draw.rect(screen, (0, 0, 0), (20, 20, 440, 140), 2)
+        # Cancel X button (Top Right)
+        pygame.draw.rect(screen, config.RED, (430, 10, 30, 30), border_radius=5)
+        lbl_x = config.FONT_SMALL.render("X", True, config.WHITE)
+        screen.blit(lbl_x, (445 - lbl_x.get_width()//2, 25 - lbl_x.get_height()//2))
         
         font = config.FONT_MEDIUM
         if font:
-            # Render text
-            txt_surf = font.render(self.text + ("|" if (time.time() % 1 > 0.5) else ""), True, (0, 0, 0))
-            # Wrap is hard, just clip for now
-            screen.blit(txt_surf, (30, 30))
+            # Render text - Clip to fit
+            # Text area width is 430 - 20 = 410 (minus button space)
+            display_text = self.text + ("|" if (time.time() % 1 > 0.5) else "")
+            while font.size(display_text)[0] > 400:
+                display_text = display_text[1:]
+                
+            txt_surf = font.render(display_text, True, (0, 0, 0))
+            screen.blit(txt_surf, (20, 20))
             
         # Draw Keys
         for k, label, (x, y) in KEYS_LAYOUT:
@@ -127,11 +137,13 @@ class T9Keyboard:
             if k == "#": color = (100, 200, 100) # Green for Send
             if k == "*": color = (200, 100, 100) # Red for Del
             
-            pygame.draw.rect(screen, color, (x, y, 80, 35))
-            pygame.draw.rect(screen, (0, 0, 0), (x, y, 80, 35), 2)
+            # Key Rect
+            pygame.draw.rect(screen, color, (x, y, 100, 50), border_radius=5)
+            pygame.draw.rect(screen, (0, 0, 0), (x, y, 100, 50), 2, border_radius=5)
             
+            # Label
             lbl = config.FONT_SMALL.render(f"{k} {label}", True, (0, 0, 0))
-            screen.blit(lbl, (x + 40 - lbl.get_width()//2, y + 17 - lbl.get_height()//2))
+            screen.blit(lbl, (x + 50 - lbl.get_width()//2, y + 25 - lbl.get_height()//2))
 
 
 def draw_messages(screen, state):
@@ -212,14 +224,8 @@ def handle_touch(state, pos):
     if state.get("composing", False):
         if state.get("keyboard"):
             res = state["keyboard"].handle_touch(pos)
-            if res == "SENT":
+            if res == "SENT" or res == "CANCEL":
                 state["composing"] = False
-        
-        # Exit compose if touch outside keyboard area?
-        # Keyboard is roughly bottom half, allow specific cancel button if needed
-        # Or just tap top area
-        if y < 50: 
-             state["composing"] = False
         return
 
     # List View Touches

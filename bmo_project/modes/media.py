@@ -1,6 +1,7 @@
 import pygame
 import time
 import os
+import sys
 from PIL import Image
 from .. import config
 

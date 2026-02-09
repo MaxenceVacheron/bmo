@@ -11,14 +11,15 @@ from .modes import core_modes, messages, apps, media
 from .games import snake
 
 def main():
-    # Singleton Check
-    try:
-        import socket
-        lock_socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-        lock_socket.bind('\0bmo_instance_lock')
-    except Exception:
-        print("BMO is already running!")
-        sys.exit(0)
+    # Singleton Check (Linux/Pi only)
+    if not config.IS_WINDOWS:
+        try:
+            import socket
+            lock_socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+            lock_socket.bind('\0bmo_instance_lock')
+        except Exception:
+            print("BMO is already running!")
+            sys.exit(0)
 
     print(f"🤖 Starting {config.IDENTITY}...")
     
@@ -144,8 +145,10 @@ def main():
                     pos = event.pos
                     
                     # --- 5-Tap Reset Logic ---
-                    now = time.time()
-                    state["tap_times"].append(now)
+                    # Only if NOT composing (typing on T9 triggers this easily)
+                    if not state.get("composing"):
+                        now = time.time()
+                        state["tap_times"].append(now)
                     # Keep only taps within last 2 seconds
                     state["tap_times"] = [t for t in state["tap_times"] if now - t < 2.0]
                     
