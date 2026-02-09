@@ -12,8 +12,14 @@ from .. import utils
 def get_weather(state):
     """Fetch current weather from wttr.in"""
     try:
-        url = "http://wttr.in/?format=j1"
-        with urllib.request.urlopen(url, timeout=5) as response:
+        print("Fetching weather...")
+        # Add User-Agent to avoid some blocking
+        req = urllib.request.Request(
+            "http://wttr.in/?format=j1", 
+            headers={'User-Agent': 'Mozilla/5.0'}
+        )
+        
+        with urllib.request.urlopen(req, timeout=10) as response:
             data = json.loads(response.read().decode())
             current = data['current_condition'][0]
             area = data['nearest_area'][0]
@@ -28,24 +34,38 @@ def get_weather(state):
             elif "snow" in desc_lower: icon = "snow"
             elif "storm" in desc_lower or "thunder" in desc_lower: icon = "storm"
             
-            state["weather"] = {
+            state["weather"].update({
                 "temp": f"{temp}°C",
                 "city": city,
                 "desc": desc,
                 "icon": icon,
-                "last_update": time.time()
-            }
+                "last_update": time.time(),
+                "fetching": False
+            })
             state["needs_redraw"] = True
-            print(f"Weather updated for {city}: {temp}C, {desc}")
+            print(f"Weather updated: {city}, {temp}C")
+            
     except Exception as e:
         print(f"Error fetching weather: {e}")
+        # On failure, wait 1 minute before retry (set last_update so it doesn't retry immediately if we cleared fetching)
+        # Actually, just set fetching to False. Main loop checks time.
+        # To prevent immediate retry if 20 mins passed, we should fake a last_update to "now - 19 mins"
+        # so it retries in 1 min.
+        state["weather"]["last_update"] = time.time() - 1140 
+        state["weather"]["fetching"] = False
+        state["weather"]["desc"] = "Connection Error"
 
 def draw_weather(screen, state):
     screen.fill(config.BLUE) # Nice blue background for weather
     now = time.time()
     
     # Auto-refresh every 20 mins
-    if now - state["weather"]["last_update"] > 1200:
+    # Ensure nested keys exist
+    if "fetching" not in state["weather"]: state["weather"]["fetching"] = False
+    
+    if (now - state["weather"]["last_update"] > 1200) and not state["weather"]["fetching"]:
+        state["weather"]["fetching"] = True # Lock
+        state["weather"]["desc"] = "Updating..."
         threading.Thread(target=get_weather, args=(state,), daemon=True).start()
     
     # Header area (City)
