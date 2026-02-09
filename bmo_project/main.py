@@ -399,6 +399,20 @@ def main():
                     if state.get("snake"):
                         state["snake"].draw(screen)
                 
+                # --- VISUAL FEEDBACK (CROSS) ---
+                # Draw a cross where the user clicked for 1 second
+                click_time = state.get("click_feedback", {}).get("time", 0)
+                if current_time - click_time < 0.5: # 0.5s visible
+                    cx, cy = state["click_feedback"]["pos"]
+                    # Draw Cross
+                    color = (255, 255, 255) # White
+                    size = 10
+                    pygame.draw.line(screen, color, (cx - size, cy), (cx + size, cy), 2)
+                    pygame.draw.line(screen, color, (cx, cy - size), (cx, cy + size), 2)
+                    
+                    # Force redraw while feedback is visible
+                    state["needs_redraw"] = True
+                
                 # Push to Framebuffer
                 display.update_framebuffer(screen)
                 state["needs_redraw"] = False
