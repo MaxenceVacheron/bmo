@@ -304,38 +304,40 @@ def save_messages():
     except Exception as e:
         print(f"Error saving messages: {e}")
 
+def sync_messages():
+    """Single pass message sync from remote API"""
+    try:
+        print("✉️ Manual sync...")
+        sys.stdout.flush()
+        with urllib.request.urlopen(MESSAGES_URL, timeout=10) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode())
+                new_msgs = data.get("messages", [])
+                
+                existing_ids = {m["id"] for m in state["messages"]["list"]}
+                added = False
+                for m in new_msgs:
+                    if m["id"] not in existing_ids:
+                        state["messages"]["list"].append(m)
+                        state["messages"]["unread"] = True
+                        added = True
+                
+                if added:
+                    state["messages"]["list"].sort(key=lambda x: x.get("timestamp", 0), reverse=True)
+                    save_messages()
+                    state["needs_redraw"] = True
+                    print(f"📩 Received {len(new_msgs)} messages!")
+                    sys.stdout.flush()
+                return True
+    except Exception as e:
+        print(f"Sync Error: {e}")
+        sys.stdout.flush()
+    return False
+
 def fetch_remote_messages():
-    """Fetch new messages from remote API and merge"""
+    """Background thread for periodic fetch"""
     while True:
-        try:
-            print("✉️ Fetching messages...")
-            sys.stdout.flush()
-            with urllib.request.urlopen(MESSAGES_URL, timeout=10) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode())
-                    new_msgs = data.get("messages", [])
-                    
-                    # Merge logic
-                    existing_ids = {m["id"] for m in state["messages"]["list"]}
-                    added = False
-                    for m in new_msgs:
-                        if m["id"] not in existing_ids:
-                            state["messages"]["list"].append(m)
-                            state["messages"]["unread"] = True
-                            added = True
-                    
-                    if added:
-                        # Sort by timestamp (newest first)
-                        state["messages"]["list"].sort(key=lambda x: x.get("timestamp", 0), reverse=True)
-                        save_messages()
-                        state["needs_redraw"] = True
-                        print(f"📩 Received {len(new_msgs)} messages!")
-                        sys.stdout.flush()
-        except Exception as e:
-            print(f"Error fetching messages: {e}")
-            sys.stdout.flush()
-        
-        # Poll every 5 minutes
+        sync_messages()
         time.sleep(300)
 
 # --- SYSTEM STATS ---
@@ -1429,6 +1431,11 @@ def draw_messages_menu(screen):
     pygame.draw.rect(screen, GRAY, (WIDTH//2 - 40, 280, 80, 30), border_radius=5)
     lbl = FONT_TINY.render("EXIT", False, WHITE)
     screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, 287))
+    
+    # Fetch Button (Right side)
+    pygame.draw.rect(screen, BLUE, (WIDTH - 90, 10, 80, 30), border_radius=5)
+    lbl = FONT_TINY.render("FETCH", False, WHITE)
+    screen.blit(lbl, (WIDTH - 50 - lbl.get_width()//2, 17))
 
 def draw_message_view(screen):
     screen.fill(WHITE)
@@ -1782,15 +1789,16 @@ def main():
                 
                 elif state["mode"] == "MESSAGES":
                     # Exit
-                    if HEIGHT - 50 < y < HEIGHT:
-                        if WIDTH / 2 - 50 < x < WIDTH / 2 + 50:
+                    if y > 260:
+                        if WIDTH / 2 - 40 < x < WIDTH / 2 + 40:
                             state["mode"] = "MENU"
-                    # Pagination
-                    elif y > 260:
-                        if x < 100 and state["menu_page"] > 0: state["menu_page"] -= 1
+                        elif x < 100 and state["menu_page"] > 0: state["menu_page"] -= 1
                         elif x > WIDTH - 100:
                             if len(state["messages"]["list"]) > (state["menu_page"] + 1) * 4:
                                 state["menu_page"] += 1
+                    # Manual Fetch
+                    elif 0 <= y <= 50 and x > WIDTH - 100:
+                        threading.Thread(target=sync_messages, daemon=True).start()
                     # Message Selection
                     elif 60 <= y < 280:
                         idx = (y - 60) // 55
