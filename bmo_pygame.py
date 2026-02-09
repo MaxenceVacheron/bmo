@@ -336,8 +336,18 @@ def sync_messages():
                 for m in new_msgs:
                     if m["id"] not in existing_ids:
                         state["messages"]["list"].append(m)
-                        state["messages"]["unread"] = True
+                        if not m.get("read", False):
+                            state["messages"]["unread"] = True
                         added = True
+                    else:
+                        # Update read status if changed
+                        for local_m in state["messages"]["list"]:
+                            if local_m["id"] == m["id"]:
+                                if m.get("read", False) and not local_m.get("read", False):
+                                    local_m["read"] = True
+                                    # If all messages are read, clear notification? 
+                                    # (Optimization for later, but good for now)
+
                 
                 if added:
                     state["messages"]["list"].sort(key=lambda x: x.get("timestamp", 0), reverse=True)
@@ -746,6 +756,12 @@ def trigger_random_gif():
     state["gif_player"]["gifs"] = [chosen]
     state["gif_player"]["current_gif_index"] = 0
     load_next_gif()
+    
+    if not state["gif_player"]["frames"]:
+        print("⚠️ Random GIF load failed (no frames)")
+        return
+
+    print(f"🎬 Starting Random GIF Mode with {len(state['gif_player']['frames'])} frames")
     
     state["random_gif"]["active"] = True
     state["random_gif"]["start_time"] = time.time()
