@@ -3,6 +3,7 @@ Description=BMO Companion Service
 After=network.target
 
 [Service]
+ExecStartPre=-/usr/bin/git -C /home/pi/bmo pull origin main
 ExecStart=/usr/bin/python3 /home/pi/bmo/bmo.py
 WorkingDirectory=/home/pi/bmo
 StandardOutput=inherit

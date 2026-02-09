@@ -3,8 +3,8 @@
 echo "🏠 Restoring Default Power Mode..."
 
 # 1. Enable HDMI output
-echo "📺 Enabling HDMI..."
-sudo vcgencmd display_power 1 || true
+echo "📺 HDMI remains active..."
+# sudo vcgencmd display_power 1 || true
 
 # 2. Re-enable LEDs (ACT and PWR)
 echo "💡 Enabling LEDs..."

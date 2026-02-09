@@ -3,8 +3,8 @@
 echo "🔋 Enabling Power Save Mode..."
 
 # 1. Disable HDMI output
-echo "📺 Disabling HDMI..."
-sudo vcgencmd display_power 0 || true
+echo "📺 Keeping HDMI active (Power save modified)..."
+# sudo vcgencmd display_power 0 || true
 
 # 2. Disable LEDs (ACT and PWR)
 echo "💡 Disabling LEDs..."
