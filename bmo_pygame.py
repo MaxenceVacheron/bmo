@@ -356,6 +356,9 @@ def send_read_receipt(msg_id):
         
         req = urllib.request.Request(READ_RECEIPT_URL, data=data, method='POST')
         req.add_header('Content-Type', 'application/json')
+        # HTTP Basic Auth for Read Receipt
+        auth = base64.b64encode(b"BMO:BMO").decode("ascii")
+        req.add_header('Authorization', f"Basic {auth}")
         
         with urllib.request.urlopen(req, timeout=5) as response:
             if response.status == 200:
