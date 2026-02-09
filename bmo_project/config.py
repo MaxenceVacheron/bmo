@@ -105,21 +105,12 @@ def init_fonts():
         font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
     try:
-    # Try to use the explicit font file first (downloaded or system)
-    font_path = FONT_FILE if os.path.exists(FONT_FILE) else "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-
-    try:
         FONT_LARGE = pygame.font.Font(font_path, 60)
         FONT_MEDIUM = pygame.font.Font(font_path, 35)
         FONT_SMALL = pygame.font.Font(font_path, 20)
         FONT_TINY = pygame.font.Font(font_path, 15)
     except:
         # Emergency fallback only if the specific font fails
-        FONT_LARGE = pygame.font.SysFont(None, 60)
-        FONT_MEDIUM = pygame.font.SysFont(None, 35)
-        FONT_SMALL = pygame.font.SysFont(None, 20)
-        FONT_TINY = pygame.font.SysFont(None, 15)
-    except:
         FONT_LARGE = pygame.font.SysFont(None, 60)
         FONT_MEDIUM = pygame.font.SysFont(None, 35)
         FONT_SMALL = pygame.font.SysFont(None, 20)

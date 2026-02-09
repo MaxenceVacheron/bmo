@@ -1,4 +1,7 @@
 pygame
 Pillow
 requests
-evdev; platform_system == "Linux"
+numpy
+# evdev is required on Linux (Raspberry Pi) but causes issues on Windows.
+# Install manually on Pi: pip install evdev
+

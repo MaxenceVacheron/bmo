@@ -136,53 +136,75 @@ class T9Keyboard:
 def draw_messages(screen, state):
     if state.get("composing", False):
         res = state["keyboard"].draw(screen)
-        # Handle touch logic is in main loop or separate function?
-        # We need to detect touch events here or in input handler.
-        pass
+        return
+
+    # Original BMO Style
+    screen.fill(config.PINK) # PINK background
+    
+    # Header styling
+    pygame.draw.rect(screen, config.BLACK, (0, 0, config.WIDTH, 50))
+    title = config.FONT_MEDIUM.render("BMO INBOX", True, config.WHITE)
+    screen.blit(title, (config.WIDTH//2 - title.get_width()//2, 10))
+    
+    # FETCH Button (Top Right) - RESTORED
+    pygame.draw.rect(screen, config.BLUE, (config.WIDTH - 90, 10, 80, 30), border_radius=5)
+    lbl = config.FONT_TINY.render("FETCH", True, config.WHITE)
+    screen.blit(lbl, (config.WIDTH - 50 - lbl.get_width()//2, 17))
+
+    # WRITE/COMPOSE Button (Top Left) - NEW LOCATION
+    pygame.draw.rect(screen, config.GREEN, (10, 10, 80, 30), border_radius=5)
+    lbl = config.FONT_TINY.render("WRITE", True, config.WHITE)
+    screen.blit(lbl, (50 - lbl.get_width()//2, 17))
+    
+    msgs = state["messages"]["list"]
+    if not msgs:
+        lbl = config.FONT_SMALL.render("No messages yet!", True, config.BLACK)
+        screen.blit(lbl, (config.WIDTH//2 - lbl.get_width()//2, config.HEIGHT//2))
     else:
-        # View Messages List
-        screen.fill(config.WHITE)
+        # Pagination
+        items_per_page = 4
+        page = state.get("menu_page", 0)
+        start_idx = page * items_per_page
+        visible = msgs[start_idx:start_idx + items_per_page]
         
-        # Header
-        pygame.draw.rect(screen, config.MAIN_COLOR, (0, 0, config.WIDTH, 50))
-        title = config.FONT_MEDIUM.render("MESSAGES", True, config.WHITE)
-        screen.blit(title, (20, 10))
-        
-        # Compose Button
-        pygame.draw.rect(screen, config.GREEN, (350, 10, 100, 30))
-        lbl = config.FONT_SMALL.render("COMPOSE", True, config.WHITE)
-        screen.blit(lbl, (360, 15))
-        
-        y = 60
-        msgs = state["messages"]["list"]
-        start_idx = state.get("scroll_y", 0) # Just index for now
-        
-        if not msgs:
-            lbl = config.FONT_SMALL.render("No messages.", True, config.GRAY)
-            screen.blit(lbl, (150, 150))
-        
-        for i in range(start_idx, min(len(msgs), start_idx + 4)):
-            m = msgs[i]
-            # Draw message item
-            color = (240, 240, 240) if m.get("read") else (255, 230, 230)
-            pygame.draw.rect(screen, color, (20, y, 440, 50))
-            pygame.draw.rect(screen, config.GRAY, (20, y, 440, 50), 1)
+        for i, m in enumerate(visible):
+            y = 60 + i * 55
+            rect = (20, y, 440, 50)
+            pygame.draw.rect(screen, config.WHITE, rect, border_radius=10)
+            pygame.draw.rect(screen, config.BLACK, rect, 2, border_radius=10)
             
             sender = m.get("sender", "Unknown")
-            txt = m.get("content", "")
-            if len(txt) > 30: txt = txt[:27] + "..."
+            content = m.get("content", "")
+            if len(content) > 30: content = content[:27] + "..."
             
-            name_lbl = config.FONT_SMALL.render(sender, True, config.BLACK)
-            txt_lbl = config.FONT_TINY.render(txt, True, config.GRAY)
+            ts = m.get("timestamp", 0)
+            formatted_time = time.strftime("%d/%m %H:%M", time.localtime(ts)) if ts else ""
             
-            screen.blit(name_lbl, (30, y + 5))
-            screen.blit(txt_lbl, (30, y + 25))
+            lbl_s = config.FONT_TINY.render(f"From: {sender}", True, config.BLACK)
+            lbl_t = config.FONT_TINY.render(formatted_time, True, config.GRAY)
+            lbl_c = config.FONT_SMALL.render(content, True, config.BLACK)
             
-            # Read indicator
+            screen.blit(lbl_s, (40, y + 5))
+            screen.blit(lbl_t, (config.WIDTH - 40 - lbl_t.get_width(), y + 5))
+            screen.blit(lbl_c, (40, y + 22))
+            
+            # Unread indicator
             if not m.get("read"):
-                pygame.draw.circle(screen, config.RED, (450, y+25), 5)
-                
-            y += 60
+                 pygame.draw.circle(screen, config.RED, (450, y+25), 5)
+
+        # Navigation
+        nav_y = 280
+        if page > 0:
+            lbl = config.FONT_TINY.render("< PREV", True, config.BLACK)
+            screen.blit(lbl, (20, nav_y))
+        if len(msgs) > (page + 1) * items_per_page:
+            lbl = config.FONT_TINY.render("NEXT >", True, config.BLACK)
+            screen.blit(lbl, (config.WIDTH - 80, nav_y))
+
+    # EXIT Button (Center Bottom)
+    pygame.draw.rect(screen, config.GRAY, (config.WIDTH//2 - 40, 280, 80, 30), border_radius=5)
+    lbl = config.FONT_TINY.render("EXIT", True, config.WHITE)
+    screen.blit(lbl, (config.WIDTH//2 - lbl.get_width()//2, 287))
 
 def handle_touch(state, pos):
     x, y = pos
@@ -192,17 +214,58 @@ def handle_touch(state, pos):
             if res == "SENT":
                 state["composing"] = False
         
-        # Exit compose if touch outside?
-        if x > 400 and y < 50: # Top right corner cancel
+        # Exit compose if touch outside keyboard area?
+        # Keyboard is roughly bottom half, allow specific cancel button if needed
+        # Or just tap top area
+        if y < 50: 
              state["composing"] = False
-             
-    else:
-        # List view touches
-        if 350 <= x <= 450 and 10 <= y <= 40:
-            # Compose button
-            state["composing"] = True
-            state["keyboard"] = T9Keyboard()
-            state["keyboard"].recipient = "AMO" if config.IDENTITY == "BMO" else "BMO"
-            
-        # Message click logic...
-        # For now simple scrolling or selecting could be implemented
+        return
+
+    # List View Touches
+    # FETCH (Top Right)
+    if x > config.WIDTH - 90 and y < 40:
+        network.sync_messages(state)
+        return
+
+    # WRITE (Top Left)
+    if x < 90 and y < 40:
+        state["composing"] = True
+        state["keyboard"] = T9Keyboard()
+        # Auto-recipient based on identity
+        state["keyboard"].recipient = "BMO" if config.IDENTITY == "AMO" else "AMO"
+        return
+
+    # EXIT (Bottom Center)
+    if config.WIDTH//2 - 40 <= x <= config.WIDTH//2 + 40 and y > 280:
+        state["mode"] = "MENU" # Go back to menu
+        return
+
+    # PREV/NEXT
+    page = state.get("menu_page", 0)
+    items_per_page = 4
+    msgs = state["messages"]["list"]
+    
+    if y > 280:
+        if x < 100 and page > 0:
+            state["menu_page"] = page - 1
+        elif x > config.WIDTH - 100 and len(msgs) > (page + 1) * items_per_page:
+            state["menu_page"] = page + 1
+        return
+
+    # Message Click
+    # Rows start at 60, height 55 (50 + 5 gap?)
+    # y = 60 + i * 55
+    # i = (y - 60) // 55
+    if 60 <= y <= 280:
+        idx = (y - 60) // 55
+        start_idx = page * items_per_page
+        real_idx = start_idx + idx
+        if 0 <= idx < 4 and real_idx < len(msgs):
+            # View Message
+            # state["mode"] = "MESSAGE_VIEW" # Need to ensure this mode exists or handle view here
+            # For now just toggle read
+            msgs[real_idx]["read"] = True
+            # In original code, it goes to specific view. 
+            # We haven't implemented MESSAGE_VIEW in this file yet? 
+            # It was in bmo_pygame.py draw_message_view.
+            pass

@@ -11,21 +11,17 @@ def render_text_with_emoji(text, size, color, font_path=None):
     
     # Select best available font if none provided
     if font_path is None:
-        if os.path.exists(config.FONT_FILE):
-             font_path = config.FONT_FILE
-        else:
+        if os.path.exists("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"):
              font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        elif os.path.exists(config.FONT_FILE):
+             font_path = config.FONT_FILE
     
     try:
         pil_font = ImageFont.truetype(font_path, size)
-    except IOError:
-        try:
-            # Fallback for Windows if arial.ttf lookup fails
-            pil_font = ImageFont.truetype("C:\\Windows\\Fonts\\arial.ttf", size)
-        except:
-            # Last resort
-            print("⚠️ Warning: Could not load requested font, using default PIL font (ugly).")
-            pil_font = ImageFont.load_default()
+    except:
+        # Last resort - Default PIL font
+        # print("⚠️ Warning: Using default PIL font (may be small/ugly).")
+        pil_font = ImageFont.load_default()
 
     # Calculate text size (dummy)
     dummy_img = Image.new('RGBA', (1, 1), (0, 0, 0, 0))

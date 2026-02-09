@@ -22,7 +22,7 @@ git push origin main
 
 # 2. Prepare Raspberry Pi (Force Clean)
 echo "🧹 Configuring Raspberry Pi environment..."
-ssh $SSH_TARGET "sudo git config --global --add safe.directory /home/pi/bmo && echo \"pi ALL=(ALL) NOPASSWD: ALL\" | sudo tee /etc/sudoers.d/010_pi-nopasswd && cd /home/pi/bmo && git reset --hard HEAD && git clean -fd"
+ssh $SSH_TARGET "sudo git config --global --add safe.directory /home/pi/bmo && echo \"pi ALL=(ALL) NOPASSWD: ALL\" | sudo tee /etc/sudoers.d/010_pi-nopasswd && cd /home/pi/bmo && git reset --hard HEAD && git clean -fd && (pip3 install -r requirements.txt --break-system-packages || pip3 install -r requirements.txt)"
 
 # 3. Push to Raspberry Pi
 echo "📲 Pushing to BMO Device..."
@@ -78,6 +78,6 @@ echo "✅ Cron jobs installed (Every minute + On Boot)!"
 
 EOF
 
-echo "🎉 Deployment Complete!"
+echo "🎉 Deployment Complete! The service has been restarted."
 echo "📋 Tailing logs (Ctrl+C to stop)..."
 ssh $SSH_TARGET "sudo journalctl -u bmo.service -f -n 50"
