@@ -231,6 +231,9 @@ def draw_gif(screen, state):
     screen.blit(frame, (x, y))
 
     # Hints
+    if time.time() - state["gif_player"].get("last_touch_time", 0) < 1.0:
+        hint_left = config.FONT_SMALL.render("<", True, config.WHITE)
+        hint_right = config.FONT_SMALL.render(">", True, config.WHITE)
         screen.blit(hint_left, (10, config.HEIGHT - 30))
         screen.blit(hint_right, (config.WIDTH - 30, config.HEIGHT - 30))
 
