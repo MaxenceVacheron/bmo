@@ -107,6 +107,8 @@ import random
 
 def start_gif_player(state, subdir):
     path = os.path.join(config.NEXTCLOUD_PATH, subdir, "Photos", "GIFs")
+    print(f"🎞️ Starting GIF Player. Searching in: {path}")
+
     if "gif_player" not in state: state["gif_player"] = {}
     
     state["gif_player"]["path"] = path
@@ -116,12 +118,17 @@ def start_gif_player(state, subdir):
         try:
             for f in os.listdir(path):
                 if f.lower().endswith('.gif'):
-                    state["gif_player"]["gifs"].append(os.path.join(path, f))
+                    full_path = os.path.join(path, f)
+                    state["gif_player"]["gifs"].append(full_path)
         except (OSError, IOError) as e:
-            print(f"Error accessing GIF path {path}: {e}")
+            print(f"❌ Error accessing GIF path {path}: {e}")
+    else:
+        print(f"❌ Path not found: {path}")
     
+    print(f"🎞️ Found {len(state['gif_player']['gifs'])} GIFs")
+
     if not state["gif_player"]["gifs"]:
-        print(f"No GIFs found in {path}")
+        print(f"⚠️ No GIFs found in {path}")
         state["current_mode"] = "MENU"
         return
 
@@ -134,6 +141,7 @@ def start_gif_player(state, subdir):
     state["current_mode"] = "GIF_PLAYER"
 
 def _load_gif_frames(gif_path):
+    print(f"🎞️ Loading GIF: {gif_path}")
     frames = []
     duration = 0.1
     try:
@@ -162,8 +170,9 @@ def _load_gif_frames(gif_path):
                 frame_num += 1
             except EOFError:
                 break
+        print(f"✅ Loaded {len(frames)} frames. Duration: {duration}s")
     except Exception as e:
-        print(f"Error loading GIF: {e}")
+        print(f"❌ Error loading GIF {gif_path}: {e}")
     return frames, duration
 
 def load_next_gif(state):
@@ -238,6 +247,7 @@ def draw_gif(screen, state):
         screen.blit(hint_right, (config.WIDTH - 30, config.HEIGHT - 30))
 
 def trigger_random_gif(state):
+    print("🎲 Triggering Random GIF...")
     # Search in both default and perso
     candidates = []
     for subdir in ["default", "perso"]:
@@ -249,17 +259,22 @@ def trigger_random_gif(state):
                         candidates.append(os.path.join(path, f))
             except: pass
             
-    if not candidates: return
+    if not candidates:
+        print("❌ No GIF candidates found for random trigger.")
+        return
 
     # Pick one
     gif_path = random.choice(candidates)
+    print(f"🎲 Selected random GIF: {gif_path}")
     
     # Init GIF Player State specifically for random play
     if "gif_player" not in state: state["gif_player"] = {}
     
     # We manually set the GIF check this
     frames, duration = _load_gif_frames(gif_path)
-    if not frames: return
+    if not frames:
+        print("❌ Failed to load random GIF frames.")
+        return
     
     state["gif_player"]["frames"] = frames
     state["gif_player"]["frame_duration"] = duration
