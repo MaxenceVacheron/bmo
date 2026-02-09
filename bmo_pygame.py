@@ -24,6 +24,7 @@ BMO_FACES_ROOT = "/home/pi/bmo/bmo_faces"
 IDLE_THOUGHT_DIR = "/home/pi/bmo/bmo_assets/idle/thought"
 MESSAGES_FILE = "/home/pi/bmo/messages.json"
 MESSAGES_URL = "https://bmo.pg.maxencevacheron.fr"
+READ_RECEIPT_URL = "https://bmo.pg.maxencevacheron.fr/read"
 
 def load_config():
     """Load configuration from file"""
@@ -333,6 +334,27 @@ def sync_messages():
         print(f"Sync Error: {e}")
         sys.stdout.flush()
     return False
+
+def send_read_receipt(msg_id):
+    """Notify the API that a message has been read"""
+    try:
+        data = json.dumps({
+            "message_id": msg_id,
+            "read_at": int(time.time())
+        }).encode('utf-8')
+        
+        req = urllib.request.Request(READ_RECEIPT_URL, data=data, method='POST')
+        req.add_header('Content-Type', 'application/json')
+        
+        with urllib.request.urlopen(req, timeout=5) as response:
+            if response.status == 200:
+                print(f"✅ Read receipt sent for {msg_id}")
+            else:
+                print(f"⚠️ Failed to send receipt for {msg_id}: {response.status}")
+        sys.stdout.flush()
+    except Exception as e:
+        print(f"Receipt Error: {e}")
+        sys.stdout.flush()
 
 def fetch_remote_messages():
     """Background thread for periodic fetch"""
@@ -1413,9 +1435,15 @@ def draw_messages_menu(screen):
             content = m.get("content", "")
             if len(content) > 30: content = content[:27] + "..."
             
+            # Format timestamp
+            ts = m.get("timestamp", 0)
+            formatted_time = time.strftime("%d/%m %H:%M", time.localtime(ts)) if ts else ""
+            
             lbl_s = FONT_TINY.render(f"From: {sender}", False, BLACK)
+            lbl_t = FONT_TINY.render(formatted_time, False, GRAY)
             lbl_c = FONT_SMALL.render(content, False, BLACK)
             screen.blit(lbl_s, (40, y + 5))
+            screen.blit(lbl_t, (WIDTH - 40 - lbl_t.get_width(), y + 5))
             screen.blit(lbl_c, (40, y + 22))
             
         # Draw Nav
@@ -1450,6 +1478,12 @@ def draw_message_view(screen):
     title = FONT_SMALL.render(f"Message from {msg.get('sender', '...')}", False, WHITE)
     screen.blit(title, (WIDTH//2 - title.get_width()//2, 15))
     
+    # Date display
+    ts = msg.get("timestamp", 0)
+    formatted_date = time.strftime("%A %d %B, %H:%M", time.localtime(ts)) if ts else ""
+    date_surf = FONT_TINY.render(formatted_date, False, GRAY)
+    screen.blit(date_surf, (20, 55))
+    
     # Word wrap content
     content = msg.get("content", "")
     words = content.split(' ')
@@ -1463,7 +1497,7 @@ def draw_message_view(screen):
             line = [w]
     lines.append(' '.join(line))
     
-    y = 70
+    y = 85
     for l in lines:
         surf = FONT_SMALL.render(l, False, BLACK)
         screen.blit(surf, (20, y))
@@ -1651,9 +1685,12 @@ def main():
                         if state["messages"]["unread"] and x > WIDTH - 60 and y > HEIGHT - 60:
                             if state["messages"]["list"]:
                                 # Open the most recent message
-                                state["messages"]["viewing_id"] = state["messages"]["list"][0]["id"]
+                                msg_id = state["messages"]["list"][0]["id"]
+                                state["messages"]["viewing_id"] = msg_id
                                 state["messages"]["unread"] = False
                                 state["mode"] = "MESSAGE_VIEW"
+                                # Send read receipt
+                                threading.Thread(target=send_read_receipt, args=(msg_id,), daemon=True).start()
                                 continue
 
                         # Normal face tap -> Menu
@@ -1813,8 +1850,11 @@ def main():
                         idx = (y - 60) // 55
                         real_idx = (state["menu_page"] * 4) + int(idx)
                         if real_idx < len(state["messages"]["list"]):
-                            state["messages"]["viewing_id"] = state["messages"]["list"][real_idx]["id"]
+                            msg_id = state["messages"]["list"][real_idx]["id"]
+                            state["messages"]["viewing_id"] = msg_id
                             state["mode"] = "MESSAGE_VIEW"
+                            # Send read receipt
+                            threading.Thread(target=send_read_receipt, args=(msg_id,), daemon=True).start()
                 
                 elif state["mode"] == "MESSAGE_VIEW":
                     # All clicks return to inbox (simple nav)
