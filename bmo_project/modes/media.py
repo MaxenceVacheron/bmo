@@ -60,7 +60,7 @@ def update_slideshow(state):
             new_size = (int(img_w * scale), int(img_h * scale))
             
             # Resize with PIL (high quality)
-            pil_img = pil_img.resize(new_size, Image.Resampling.LANCZOS)
+            pil_img = pil_img.resize(new_size, Image.Resampling.BILINEAR)
             
             # Convert to Pygame
             mode = pil_img.mode
@@ -68,8 +68,12 @@ def update_slideshow(state):
             data = pil_img.tobytes()
             pygame_img = pygame.image.fromstring(data, size, mode)
             
-            # Create centered surface
-            converted = pygame.Surface((config.WIDTH, config.HEIGHT))
+            # OPTIMIZATION: Convert immediately
+            if config.SURFACE_DEPTH == 16:
+                converted = pygame.Surface((config.WIDTH, config.HEIGHT), depth=16, masks=config.SURFACE_MASKS)
+            else:
+                converted = pygame.Surface((config.WIDTH, config.HEIGHT))
+                
             converted.fill(config.BLACK)
             
             x = (config.WIDTH - new_size[0]) // 2
@@ -161,13 +165,21 @@ def _load_gif_frames(gif_path):
                 img_w, img_h = frame.size
                 scale = min(config.WIDTH / img_w, config.HEIGHT / img_h)
                 new_size = (int(img_w * scale), int(img_h * scale))
-                frame = frame.resize(new_size, Image.Resampling.NEAREST)
+                frame = frame.resize(new_size, Image.Resampling.NEAREST) # Nearest neighbor is fastest and retro for GIFs
                 
                 mode = frame.mode
                 size = frame.size
                 data = frame.tobytes()
                 pygame_frame = pygame.image.fromstring(data, size, mode)
-                frames.append(pygame_frame)
+                
+                # OPTIMIZATION: Convert immediately
+                if config.SURFACE_DEPTH == 16:
+                   surf = pygame.Surface((new_size[0], new_size[1]), depth=16, masks=config.SURFACE_MASKS)
+                   surf.blit(pygame_frame, (0,0))
+                   frames.append(surf)
+                else:
+                   frames.append(pygame_frame.convert())
+                   
                 frame_num += 1
             except EOFError:
                 break

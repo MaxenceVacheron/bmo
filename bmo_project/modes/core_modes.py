@@ -41,10 +41,18 @@ def load_random_face(state, emotion=None):
             def _prep_surf(path):
                 if not os.path.exists(path): return None
                 img = Image.open(path).convert('RGB')
-                img = img.resize((config.WIDTH, config.HEIGHT), Image.Resampling.LANCZOS)
+                img = img.resize((config.WIDTH, config.HEIGHT), Image.Resampling.BILINEAR)
                 data = img.tobytes()
                 pygame_img = pygame.image.fromstring(data, img.size, img.mode)
-                return pygame_img
+                
+                # OPTIMIZATION: Convert to display format immediately!
+                if config.SURFACE_DEPTH == 16:
+                    # Pi Specific: Create 16-bit surface and blit
+                    surf = pygame.Surface((config.WIDTH, config.HEIGHT), depth=16, masks=config.SURFACE_MASKS)
+                    surf.blit(pygame_img, (0, 0))
+                    return surf
+                else:
+                    return pygame_img.convert()
 
             state["current_face_open"] = _prep_surf(open_path)
             state["current_face_closed"] = _prep_surf(closed_path)

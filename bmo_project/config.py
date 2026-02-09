@@ -31,12 +31,16 @@ FONT_FILE = os.path.join(BASE_DIR, "DejaVuSans-Bold.ttf")
 if IS_WINDOWS:
     FB_DEVICE = None
     TOUCH_DEVICE = None
+    SURFACE_DEPTH = 32
+    SURFACE_MASKS = None
     # Ensure dirs exist
     for d in [NEXTCLOUD_PATH, BMO_FACES_ROOT, IDLE_THOUGHT_DIR]:
         os.makedirs(d, exist_ok=True)
 else:
     FB_DEVICE = "/dev/fb1"
     TOUCH_DEVICE = "/dev/input/event4"
+    SURFACE_DEPTH = 16
+    SURFACE_MASKS = (0xF800, 0x07E0, 0x001F, 0)
 
 # API Configuration
 SERVER_URL = "https://bmo.pg.maxencevacheron.fr" 

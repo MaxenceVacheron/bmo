@@ -24,7 +24,7 @@ def init_display():
         pygame.init()
         # Create Surface matching Framebuffer format (RGB565)
         # 16-bit depth with specific masks for 5-6-5 format
-        screen = pygame.Surface((config.WIDTH, config.HEIGHT), depth=16, masks=(0xF800, 0x07E0, 0x001F, 0))
+        screen = pygame.Surface((config.WIDTH, config.HEIGHT), depth=config.SURFACE_DEPTH, masks=config.SURFACE_MASKS)
     
     # Initialize fonts
     config.init_fonts()
