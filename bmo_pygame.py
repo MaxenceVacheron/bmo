@@ -123,6 +123,7 @@ MENUS = {
         {"label": "BRIGHTNESS", "action": "MENU:BRIGHTNESS", "color": TEAL},
         {"label": "POWER MGMT", "action": "MENU:POWER", "color": ORANGE},
         {"label": "BOOT MODE", "action": "MENU:DEFAULT_MODE", "color": BLUE},
+        {"label": "REBOOT", "action": "SYSTEM:REBOOT", "color": RED},
         {"label": "< BACK", "action": "BACK", "color": GRAY},
     ],
     "BRIGHTNESS": [
@@ -1905,6 +1906,17 @@ def main():
                                 state["menu_stack"].pop()
                             state["menu_page"] = 0
                             state["mode"] = "MENU"
+                        elif action == "SYSTEM:REBOOT":
+                            screen.fill(BLACK)
+                            lbl = FONT_MEDIUM.render("REBOOTING...", False, RED)
+                            screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, HEIGHT//2))
+                            # Force write to framebuffer
+                            try:
+                                with open(FB_DEVICE, "wb") as f:
+                                    f.write(screen.get_buffer())
+                            except: pass
+                            os.system("sudo reboot")
+                            sys.exit(0)
                 
                 elif state["mode"] == "FOCUS":
                     # If active, ignore touches? Or allow double tap to cancel?
