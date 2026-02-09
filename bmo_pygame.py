@@ -281,6 +281,12 @@ state = {
         "pos": (0, 0),
         "time": 0
     },
+    "random_gif": {
+        "active": False,
+        "start_time": 0,
+        "last_trigger": time.time(),
+        "current_gif": None
+    },
     "messages": {
         "list": [],
         "unread": False,
@@ -720,7 +726,33 @@ def start_gif_player(subdir):
     state["gif_player"]["current_gif_index"] = 0
     state["gif_player"]["gif_switch_time"] = time.time()
     load_next_gif()
+    state["gif_player"]["current_gif_index"] = 0
+    state["gif_player"]["gif_switch_time"] = time.time()
+    load_next_gif()
     state["mode"] = "GIF_PLAYER"
+
+def trigger_random_gif():
+    """Select and play a random GIF for a short time"""
+    all_gifs = []
+    # Scan recursively for GIFs in Nextcloud path
+    for root, dirs, files in os.walk(NEXTCLOUD_PATH):
+        for f in files:
+            if f.lower().endswith('.gif'):
+                all_gifs.append(os.path.join(root, f))
+    
+    if not all_gifs: return
+    
+    chosen = random.choice(all_gifs)
+    print(f"🎲 Random GIF detected: {chosen}")
+    
+    # Reuse GIF player logic but with specific mode
+    state["gif_player"]["gifs"] = [chosen]
+    state["gif_player"]["current_gif_index"] = 0
+    load_next_gif()
+    
+    state["random_gif"]["active"] = True
+    state["random_gif"]["start_time"] = time.time()
+    state["mode"] = "RANDOM_GIF"
 
 def _load_gif_frames(gif_path):
     """Helper function to load GIF frames and duration"""
@@ -1663,7 +1695,30 @@ def main():
     start_time = time.time()
     frame_count = 0
     running = True
+    frame_count = 0
+    running = True
+
+    # --- MAIN LOGIC ---
     while running:
+        current_time = time.time()
+        
+        # Random GIF Logic (only in FACE/HOME mode)
+        if state["mode"] == "FACE":
+            if current_time - state["random_gif"]["last_trigger"] > 60:
+                trigger_random_gif()
+                state["random_gif"]["last_trigger"] = current_time
+                
+        # Random GIF Mode Handling
+        if state["mode"] == "RANDOM_GIF":
+             # Draw GIF
+            draw_gif_player(screen)
+            
+            # Check duration (5 seconds)
+            if current_time - state["random_gif"]["start_time"] > 5:
+                state["mode"] = "FACE"
+                state["random_gif"]["active"] = False
+                state["needs_redraw"] = True
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -1949,6 +2004,8 @@ def main():
             elif state["mode"] == "SLIDESHOW":
                 draw_slideshow(screen)
             elif state["mode"] == "GIF_PLAYER":
+                draw_gif(screen)
+            elif state["mode"] == "RANDOM_GIF":
                 draw_gif(screen)
             elif state["mode"] == "TEXT_VIEWER":
                 draw_text_viewer(screen)
