@@ -11,9 +11,13 @@ CONFIG_FILE = "/home/pi/bmo/bmo_config.json"
 BMO_FACES_ROOT = "/home/pi/bmo/bmo_faces"
 IDLE_THOUGHT_DIR = "/home/pi/bmo/bmo_assets/idle/thought"
 MESSAGES_FILE = "/home/pi/bmo/messages.json"
-MESSAGES_URL = "https://bmo.pg.maxencevacheron.fr"
-READ_RECEIPT_URL = "https://bmo.pg.maxencevacheron.fr/read"
-SEND_MESSAGE_URL = "https://bmo.pg.maxencevacheron.fr/send" # New URL for sending
+
+# API Configuration
+# Base URL for the server
+SERVER_URL = "https://bmo.pg.maxencevacheron.fr" 
+MESSAGES_URL = f"{SERVER_URL}" # GET / (with ?recipient=...)
+READ_RECEIPT_URL = f"{SERVER_URL}/read" # POST /read
+SEND_MESSAGE_URL = f"{SERVER_URL}/send" # POST /send
 
 # --- IDENTITY ---
 # Determine identity from Environment Variable or Config

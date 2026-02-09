@@ -1,10 +1,21 @@
 import base64
 import json
 import urllib.request
+import urllib.parse
 import time
 import sys
 import threading
 from . import config
+
+def get_auth_headers():
+    """Return Basic Auth headers based on identity"""
+    # Use identity as both username and password as per requirements
+    username = config.IDENTITY
+    password = config.IDENTITY
+    auth_str = f"{username}:{password}"
+    auth_bytes = auth_str.encode("ascii")
+    auth_b64 = base64.b64encode(auth_bytes).decode("ascii")
+    return {"Authorization": f"Basic {auth_b64}"}
 
 def sync_messages(state):
     """Single pass message sync from remote API"""
@@ -12,30 +23,19 @@ def sync_messages(state):
         print("✉️ Manual sync...")
         sys.stdout.flush()
         
-        # HTTP Basic Auth
-        # Use config.IDENTITY to determine auth if needed, but for now assuming BMO:BMO or AMO:AMO?
-        # The user said "create another BMO, named AMO".
-        # I'll assume the credentials might need to change based on identity.
-        # For now, let's keep it simple: BMO:BMO.
-        # Wait, if I am AMO, maybe I should use AMO:AMO?
-        # The user didn't specify credentials. I'll stick to BMO:BMO for read, but maybe send needs identity.
+        headers = get_auth_headers()
         
-        # Actually, let's use the identity for auth
-        auth_str = f"{config.IDENTITY}:{config.IDENTITY}"
-        auth = base64.b64encode(auth_str.encode("ascii")).decode("ascii")
-        headers = {"Authorization": f"Basic {auth}"}
+        # Filter messages for current recipient
+        params = urllib.parse.urlencode({'recipient': config.IDENTITY})
+        url = f"{config.MESSAGES_URL}/?{params}"
         
-        req = urllib.request.Request(config.MESSAGES_URL, headers=headers)
+        req = urllib.request.Request(url, headers=headers)
         
         with urllib.request.urlopen(req, timeout=10) as response:
             if response.status == 200:
                 data = json.loads(response.read().decode())
+                # Server returns {"messages": [...]}
                 new_msgs = data.get("messages", [])
-                
-                # Filter messages intended for ME (config.IDENTITY)
-                # Assuming the server returns all messages or messages are filtered by auth.
-                # If server filtering isn't "smart", we might receive messages for the other bot.
-                # But typically "my messages" are what I get.
                 
                 existing_ids = {m["id"] for m in state["messages"]["list"]}
                 added = False
@@ -51,10 +51,7 @@ def sync_messages(state):
                             if local_m["id"] == m["id"]:
                                 if m.get("read", False) and not local_m.get("read", False):
                                     local_m["read"] = True
-                                    # If all messages are read, clear notification? 
-                                    # (Optimization for later, but good for now)
 
-                
                 if added:
                     state["messages"]["list"].sort(key=lambda x: x.get("timestamp", 0), reverse=True)
                     save_messages(state)
@@ -70,20 +67,19 @@ def sync_messages(state):
 def send_read_receipt(msg_id):
     """Notify the API that a message has been read"""
     try:
-        # Add +1h (3600s) to match server expectation
-        read_time = int(time.time()) + 3600
+        # Add +1h (3600s) to match server expectation? 
+        # Server expects "read_at". Let's use current time.
+        read_time = int(time.time())
         
         data = json.dumps({
             "message_id": msg_id,
             "read_at": read_time
         }).encode('utf-8')
         
-        req = urllib.request.Request(config.READ_RECEIPT_URL, data=data, method='POST')
-        req.add_header('Content-Type', 'application/json')
+        headers = get_auth_headers()
+        headers['Content-Type'] = 'application/json'
         
-        auth_str = f"{config.IDENTITY}:{config.IDENTITY}"
-        auth = base64.b64encode(auth_str.encode("ascii")).decode("ascii")
-        req.add_header('Authorization', f"Basic {auth}")
+        req = urllib.request.Request(config.READ_RECEIPT_URL, data=data, headers=headers, method='POST')
         
         with urllib.request.urlopen(req, timeout=5) as response:
             if response.status == 200:
@@ -101,21 +97,21 @@ def send_message(recipient, content):
         print(f"📤 Sending to {recipient}: {content}")
         sys.stdout.flush()
         
-        timestamp = int(time.time()) + 3600 # Adjust timezone if needed
+        timestamp = int(time.time())
         
-        data = json.dumps({
+        payload = {
             "sender": config.IDENTITY,
             "recipient": recipient,
             "content": content,
             "timestamp": timestamp 
-        }).encode('utf-8')
+        }
         
-        req = urllib.request.Request(config.SEND_MESSAGE_URL, data=data, method='POST')
-        req.add_header('Content-Type', 'application/json')
+        data = json.dumps(payload).encode('utf-8')
         
-        auth_str = f"{config.IDENTITY}:{config.IDENTITY}"
-        auth = base64.b64encode(auth_str.encode("ascii")).decode("ascii")
-        req.add_header('Authorization', f"Basic {auth}")
+        headers = get_auth_headers()
+        headers['Content-Type'] = 'application/json'
+        
+        req = urllib.request.Request(config.SEND_MESSAGE_URL, data=data, headers=headers, method='POST')
         
         with urllib.request.urlopen(req, timeout=10) as response:
             if response.status == 200:
