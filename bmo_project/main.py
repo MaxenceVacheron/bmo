@@ -337,17 +337,27 @@ def main():
             # Redraw if needed
             current_time = time.time()
             
-            # Redraw if needed
-            if state["needs_redraw"] or (current_time % 1.0 < 0.1): # Force redraw occasionally or on logic
-                # Actually, for clock we need per-minute, for animations per-frame
-                # Let's just redraw on event or logic trigger.
-                # But Clock needs auto update.
-                if state["current_mode"] == "CLOCK":
-                     state["needs_redraw"] = True # Force redraw for clock
-                
-                # Input cursor blink
-                if state.get("composing"):
+            # --- CLOCK UPDATE ---
+            # Ensure clock updates every second
+            if state["current_mode"] == "CLOCK":
+                 if int(current_time) != int(state.get("last_clock_update", 0)):
+                     state["last_clock_update"] = current_time
                      state["needs_redraw"] = True
+
+            # --- CURSOR BLINK ---
+            if state.get("composing"):
+                # Force redraw every 0.5s for cursor
+                if int(current_time * 2) % 2 == 0:
+                     if not state.get("cursor_visible", False):
+                         state["cursor_visible"] = True
+                         state["needs_redraw"] = True
+                else:
+                     if state.get("cursor_visible", True):
+                         state["cursor_visible"] = False
+                         state["needs_redraw"] = True
+
+            # --- REDRAW LOGIC ---
+            if state["needs_redraw"]:
                 
                 # Clear
                 screen.fill(config.BLACK)

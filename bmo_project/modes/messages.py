@@ -123,8 +123,11 @@ class T9Keyboard:
         font = config.FONT_MEDIUM
         if font:
             # Render text - Clip to fit
+            # Check global state for cursor (managed in main.py)
+            show_cursor = self.state.get("cursor_visible", True)
+            display_text = self.text + ("|" if show_cursor else "")
+            
             # Text area width is 430 - 20 = 410 (minus button space)
-            display_text = self.text + ("|" if (time.time() % 1 > 0.5) else "")
             while font.size(display_text)[0] > 400:
                 display_text = display_text[1:]
                 
