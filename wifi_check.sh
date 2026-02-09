@@ -5,47 +5,43 @@ PING_TARGET="8.8.8.8"
 INTERFACE="wlan0"
 LOG_FILE="/var/log/wifi_check.log"
 
+# Environment safety
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
 # Check connection
-if ! ping -c 1 -W 5 $PING_TARGET > /dev/null; then
+if ! /bin/ping -c 1 -W 5 $PING_TARGET > /dev/null; then
     echo "------------------------------------------" >> $LOG_FILE
-    echo "$(date): [CHECK] Network is unreachable. Starting recovery..." >> $LOG_FILE
+    echo "$(date): [CHECK] Network unreachable. Starting AGGRESSIVE recovery..." >> $LOG_FILE
     
-    # Log current status for debugging
-    echo "$(date): [DEBUG] Current IP: $(ip -4 addr show $INTERFACE | grep inet | awk '{print $2}')" >> $LOG_FILE
-    echo "$(date): [DEBUG] WiFi Status: $(iwconfig $INTERFACE | grep ESSID)" >> $LOG_FILE
+    # Log current status
+    echo "$(date): [DEBUG] IP: $(/sbin/ip -4 addr show $INTERFACE | /usr/bin/grep inet | /usr/bin/awk '{print $2}')" >> $LOG_FILE
     
-    # Level 1: Quick reconfigure
-    echo "$(date): [LEVEL 1] Attempting wpa_cli reconfigure..." >> $LOG_FILE
-    wpa_cli -i $INTERFACE reconfigure >> $LOG_FILE 2>&1
-    sleep 5
+    # AGGRESSIVE RECOVERY
+    echo "$(date): [FORCE] Killing wpa_supplicant and removing stale socket..." >> $LOG_FILE
+    /usr/bin/killall -9 wpa_supplicant >> $LOG_FILE 2>&1 || true
+    /bin/rm -v -f /var/run/wpa_supplicant/$INTERFACE >> $LOG_FILE 2>&1
     
-    if ! ping -c 1 -W 5 $PING_TARGET > /dev/null; then
-        echo "$(date): [LEVEL 1] FAILED. Level 2: Nuke & Restart Service..." >> $LOG_FILE
-        killall wpa_supplicant >> $LOG_FILE 2>&1 || true
-        rm -v -f /var/run/wpa_supplicant/$INTERFACE >> $LOG_FILE 2>&1
-        ip link set $INTERFACE down >> $LOG_FILE 2>&1
-        sleep 2
-        ip link set $INTERFACE up >> $LOG_FILE 2>&1
-        sleep 2
-        systemctl restart wpa_supplicant >> $LOG_FILE 2>&1
-        sleep 10
-    fi
+    echo "$(date): [FORCE] Starting wpa_supplicant manually..." >> $LOG_FILE
+    /usr/sbin/wpa_supplicant -B -i $INTERFACE -c /etc/wpa_supplicant/wpa_supplicant.conf >> $LOG_FILE 2>&1
     
-    if ! ping -c 1 -W 5 $PING_TARGET > /dev/null; then
-        echo "$(date): [LEVEL 2] FAILED. Level 3: Manual wpa_supplicant fallback..." >> $LOG_FILE
-        killall wpa_supplicant >> $LOG_FILE 2>&1 || true
-        rm -v -f /var/run/wpa_supplicant/$INTERFACE >> $LOG_FILE 2>&1
-        wpa_supplicant -B -i $INTERFACE -c /etc/wpa_supplicant/wpa_supplicant.conf >> $LOG_FILE 2>&1
-        sleep 10
-    fi
+    # Wait for association and DHCP
+    /bin/sleep 10
     
     # Final check
-    if ping -c 1 -W 5 $PING_TARGET > /dev/null; then
-        echo "$(date): [SUCCESS] Connection restored!" >> $LOG_FILE
+    if /bin/ping -c 1 -W 5 $PING_TARGET > /dev/null; then
+        echo "$(date): [SUCCESS] Connection restored via force!" >> $LOG_FILE
     else
-        echo "$(date): [CRITICAL] All recovery levels failed. Is the hotspot on?" >> $LOG_FILE
-        # Final debug dump
-        echo "$(date): [DEBUG] Final check: $(ip addr show $INTERFACE)" >> $LOG_FILE
+        echo "$(date): [CRITICAL] Recovery failed. Attempting level 2 (restart service)..." >> $LOG_FILE
+        /usr/bin/killall -9 wpa_supplicant >> $LOG_FILE 2>&1 || true
+        /bin/rm -v -f /var/run/wpa_supplicant/$INTERFACE >> $LOG_FILE 2>&1
+        /usr/bin/systemctl restart wpa_supplicant >> $LOG_FILE 2>&1
+        /bin/sleep 10
+        
+        if /bin/ping -c 1 -W 5 $PING_TARGET > /dev/null; then
+            echo "$(date): [SUCCESS] Connection restored via service restart!" >> $LOG_FILE
+        else
+            echo "$(date): [ERROR] Persistent failure." >> $LOG_FILE
+        fi
     fi
     echo "------------------------------------------" >> $LOG_FILE
 fi

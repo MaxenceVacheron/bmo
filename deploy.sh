@@ -21,8 +21,8 @@ echo "☁️ Pushing to GitHub (origin main)..."
 git push origin main
 
 # 2. Prepare Raspberry Pi (Force Clean)
-echo "🧹 Cleaning Raspberry Pi workspace..."
-ssh $SSH_TARGET "sudo git config --global --add safe.directory /home/pi/bmo && cd /home/pi/bmo && git reset --hard HEAD && git clean -fd"
+echo "🧹 Configuring Raspberry Pi environment..."
+ssh $SSH_TARGET "sudo git config --global --add safe.directory /home/pi/bmo && echo \"pi ALL=(ALL) NOPASSWD: ALL\" | sudo tee /etc/sudoers.d/010_pi-nopasswd && cd /home/pi/bmo && git reset --hard HEAD && git clean -fd"
 
 # 3. Push to Raspberry Pi
 echo "📲 Pushing to BMO Device..."

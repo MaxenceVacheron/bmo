@@ -610,9 +610,22 @@ def draw_weather(screen):
     screen.blit(desc_lbl, (WIDTH//2 - desc_lbl.get_width()//2, 275))
 
 # --- TOUCH INPUT THREAD ---
+def find_touch_device():
+    """Dynamically find the touchscreen device"""
+    from evdev import list_devices, InputDevice
+    devices = [InputDevice(path) for path in list_devices()]
+    for device in devices:
+        # Common names for the SPI touch controller
+        if "GT911" in device.name or "Goodix" in device.name or "TSC2007" in device.name:
+            print(f"🎯 Found Touchscreen: {device.name} at {device.path}")
+            return device.path
+    # Fallback to the known default if detection fails
+    return "/dev/input/event4"
+
 def touch_thread():
     try:
-        dev = InputDevice(TOUCH_DEVICE)
+        active_dev = find_touch_device()
+        dev = InputDevice(active_dev)
         raw_x, raw_y = 0, 0
         last_finger_state = False
         finger_down = False
