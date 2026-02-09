@@ -12,6 +12,7 @@ from PIL import Image
 import json
 import shutil
 import subprocess
+import base64
 from games.snake import SnakeGame
 
 # --- CONFIGURATION ---
@@ -310,7 +311,14 @@ def sync_messages():
     try:
         print("✉️ Manual sync...")
         sys.stdout.flush()
-        with urllib.request.urlopen(MESSAGES_URL, timeout=10) as response:
+        
+        # HTTP Basic Auth
+        auth = base64.b64encode(b"BMO:BMO").decode("ascii")
+        headers = {"Authorization": f"Basic {auth}"}
+        
+        req = urllib.request.Request(MESSAGES_URL, headers=headers)
+        
+        with urllib.request.urlopen(req, timeout=10) as response:
             if response.status == 200:
                 data = json.loads(response.read().decode())
                 new_msgs = data.get("messages", [])
@@ -338,9 +346,12 @@ def sync_messages():
 def send_read_receipt(msg_id):
     """Notify the API that a message has been read"""
     try:
+        # Add +1h (3600s) to match server expectation
+        read_time = int(time.time()) + 3600
+        
         data = json.dumps({
             "message_id": msg_id,
-            "read_at": int(time.time())
+            "read_at": read_time
         }).encode('utf-8')
         
         req = urllib.request.Request(READ_RECEIPT_URL, data=data, method='POST')
@@ -1437,9 +1448,6 @@ def draw_messages_menu(screen):
             
             # Format timestamp
             ts = m.get("timestamp", 0)
-            # Format timestamp (Fix +1h)
-            ts = m.get("timestamp", 0)
-            if ts: ts += 3600 
             formatted_time = time.strftime("%d/%m %H:%M", time.localtime(ts)) if ts else ""
             
             lbl_s = FONT_TINY.render(f"From: {sender}", False, BLACK)
@@ -1482,7 +1490,6 @@ def draw_message_view(screen):
     # Minimalist Fullscreen Layout
     # Date at top right
     ts = msg.get("timestamp", 0)
-    if ts: ts += 3600
     formatted_date = time.strftime("%d/%m %H:%M", time.localtime(ts)) if ts else ""
     date_surf = FONT_TINY.render(formatted_date, False, GRAY)
     screen.blit(date_surf, (WIDTH - 20 - date_surf.get_width(), 10))
