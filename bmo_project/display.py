@@ -43,8 +43,7 @@ def update_framebuffer(screen, fb_path=config.FB_DEVICE):
             with open(fb_path, "wb") as fb:
                 fb.write(screen.get_buffer())
     except IOError as e:
-        # print(f"Error writing to framebuffer: {e}") # Reduce spam for dev on PC
-        pass
+        print(f"Framebuffer Write Error: {e}")
     except Exception as e:
         print(f"Framebuffer error: {e}")
 

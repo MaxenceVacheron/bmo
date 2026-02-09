@@ -11,6 +11,15 @@ from .modes import core_modes, messages, apps, media
 from .games import snake
 
 def main():
+    # Singleton Check
+    try:
+        import socket
+        lock_socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+        lock_socket.bind('\0bmo_instance_lock')
+    except Exception:
+        print("BMO is already running!")
+        sys.exit(0)
+
     print(f"🤖 Starting {config.IDENTITY}...")
     
     # Init Display
@@ -21,7 +30,8 @@ def main():
 
     # Init State
     state = {
-        "current_mode": config.load_config().get("default_mode", "FACE"),
+        "current_mode": "STARTUP", # Start with typewriter effect
+        "default_mode": config.load_config().get("default_mode", "FACE"),
         "expression": "happy",
         "menu_stack": ["MAIN"],
         "current_menu": "MAIN",
@@ -29,6 +39,13 @@ def main():
         "loop_running": True,
         "needs_redraw": True,
         "last_interaction": time.time(),
+        
+        "startup": {
+            "message": "Hello Agnès! I'm BMO. Maxence built my brain just for you.",
+            "char_index": 0,
+            "start_time": 0,
+            "char_delay": 0.05
+        },
         
         # Identity / Face
         "emotion": "positive",
@@ -133,7 +150,7 @@ def main():
                     state["tap_times"] = [t for t in state["tap_times"] if now - t < 2.0]
                     
                     if len(state["tap_times"]) >= 5:
-                        print("🔄 5-Tap Reset Triggered! Updating...")
+                        print("🚀 BMO Auto-Update triggered!")
                         # Draw Updating Screen
                         screen.fill(config.BLACK)
                         lbl = config.FONT_MEDIUM.render("UPDATING...", True, config.WHITE)
@@ -144,7 +161,7 @@ def main():
                             # Pull latest code
                             subprocess.call(["git", "pull", "origin", "main"])
                         except Exception as e:
-                            print(f"Update failed: {e}")
+                            print(f"Error during update: {e}")
                         
                         # Exit to let systemd restart
                         sys.exit(0)
@@ -255,7 +272,10 @@ def main():
             
             # Update Logic (Face Animation & Behaviors)
             # Update Logic (Face Animation & Behaviors)
-            if state["current_mode"] == "FACE":
+            # Update Logic (Face Animation & Behaviors)
+            if state["current_mode"] == "STARTUP":
+                core_modes.update_startup(state)
+            elif state["current_mode"] == "FACE":
                 core_modes.update_face(state)
                 # Random GIF Trigger
                 if time.time() - state["random_gif"].get("last_trigger", 0) > 60:
@@ -291,7 +311,13 @@ def main():
             # Pop-up Face Logic
             # Only if not in attention-demanding modes
             if not state.get("is_showing_pop_face") and state["current_mode"] not in ["FACE", "SNAKE", "STARTUP", "GIF_PLAYER", "SLIDESHOW", "RANDOM_GIF", "FOCUS", "MESSAGE_VIEW"]:
-                if time.time() > state.get("pop_face_timer", 0):
+                # Inactivity Timeout (return to FACE)
+                if time.time() - state["last_interaction"] > 60:
+                     print("Inactivity timeout: Returning to FACE")
+                     state["current_mode"] = "FACE"
+                     state["needs_redraw"] = True
+                
+                elif time.time() > state.get("pop_face_timer", 0):
                     state["is_showing_pop_face"] = True
                     state["pop_face_end_time"] = time.time() + 5.0
                     state["needs_redraw"] = True
@@ -328,6 +354,8 @@ def main():
                 
                 if state.get("is_showing_pop_face"):
                     core_modes.draw_face(screen, state)
+                elif state["current_mode"] == "STARTUP":
+                    core_modes.draw_startup(screen, state)
                 elif state["current_mode"] == "FACE":
                     core_modes.draw_face(screen, state)
                 elif state["current_mode"] == "MENU":

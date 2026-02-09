@@ -281,8 +281,20 @@ def trigger_random_gif(state):
     state["gif_player"]["frame_index"] = 0
     state["gif_player"]["last_frame_time"] = time.time()
     
+    print(f"🎬 Starting Random GIF Mode with {len(state['gif_player']['frames'])} frames")
+    
+    state["random_gif"]["active"] = True
     state["random_gif"]["active"] = True
     state["random_gif"]["start_time"] = time.time()
-    state["random_gif"]["duration"] = 5.0 # Play for 5 seconds
+    
+    # Calculate total duration of one loop
+    gif_duration = len(frames) * duration
+    # Play at least 5 seconds, or 2 loops, whichever is appropriate
+    # If GIF is short (e.g. 1s), play 5s.
+    # If GIF is long (e.g. 10s), play 10s (1 loop).
+    state["random_gif"]["duration"] = max(5.0, gif_duration * 2) if gif_duration < 2.5 else max(5.0, gif_duration)
+    
+    print(f"⏱️ Random GIF Duration set to: {state['random_gif']['duration']:.1f}s (GIF len: {gif_duration:.1f}s)")
     
     state["current_mode"] = "RANDOM_GIF"
+    sys.stdout.flush()

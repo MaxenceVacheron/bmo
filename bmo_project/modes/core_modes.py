@@ -52,11 +52,16 @@ def load_random_face(state, emotion=None):
             # Fallback if closed version doesn't exist
             if state["current_face_closed"] is None:
                 state["current_face_closed"] = state["current_face_open"]
+                print(f"Loaded {emotion} face: {filename} (no closed version)")
+            else:
+                print(f"Loaded {emotion} face: {filename} (with blink version)")
                 
             state["last_face_switch"] = time.time()
             state["needs_redraw"] = True
+            sys.stdout.flush()
         except Exception as e:
             print(f"Error loading face images: {e}")
+            sys.stdout.flush()
 
 def load_thought_bubble():
     """Load a random thought bubble icon"""
@@ -120,10 +125,12 @@ def update_face(state):
         avg = (state["needs"]["hunger"] + state["needs"]["play"] + state["needs"]["energy"]) / 3.0
         if avg < 40:
             if state["emotion"] != "negative":
+                print("BMO feels sad/neglected...")
                 state["emotion"] = "negative"
                 load_random_face(state)
         elif avg > 60:
             if state["emotion"] != "positive":
+                print("BMO feels happy and cared for!")
                 state["emotion"] = "positive"
                 load_random_face(state)
 
@@ -141,6 +148,7 @@ def update_face(state):
     interval = 22.5 if state.get("emotion") == "negative" else 45.0
     
     if now - state["last_face_switch"] > interval:
+        print(f"Rotating face image (Emotion: {state.get('emotion')}, Interval: {interval}s)...")
         load_random_face(state)
     
     # Blinking logic (decreased frequency: 8-20 seconds)
@@ -151,6 +159,7 @@ def update_face(state):
             state["needs_redraw"] = True
     else:
         if now > state["blink_timer"]:
+            print("BMO Blink!")
             state["is_blinking"] = True
             state["blink_end_time"] = now + 0.15 # Blink duration
             state["needs_redraw"] = True
@@ -161,6 +170,7 @@ def update_face(state):
         if now > state["idle"]["thought"]["next_time"]:
             surf = load_thought_bubble()
             if surf:
+                print("BMO is thinking...")
                 state["idle"]["thought"]["is_active"] = True
                 state["idle"]["thought"]["current_image"] = surf
                 state["idle"]["thought"]["end_time"] = now + random.uniform(5, 10)
@@ -175,6 +185,7 @@ def update_face(state):
     if state["emotion"] == "positive":
         if not state["idle"]["humming"]["is_active"]:
             if now > state["idle"]["humming"]["next_time"]:
+                print("BMO is humming...")
                 state["idle"]["humming"]["is_active"] = True
                 state["idle"]["humming"]["end_time"] = now + random.uniform(6, 12)
                 state["idle"]["humming"]["notes"] = []
@@ -417,4 +428,70 @@ def draw_stats(screen, state):
     screen.fill(config.YELLOW)
     lbl = config.FONT_MEDIUM.render("SYSTEM STATS", True, config.BLACK)
     screen.blit(lbl, (config.WIDTH//2 - lbl.get_width()//2, 20))
+
+
+# --- STARTUP MODE ---
+def update_startup(state):
+    """Update typewriter animation"""
+    if state["startup"]["start_time"] == 0:
+        state["startup"]["start_time"] = time.time()
+    
+    elapsed = time.time() - state["startup"]["start_time"]
+    # 50ms per char = 20 chars per second
+    target_chars = int(elapsed / state["startup"]["char_delay"])
+    
+    msg_len = len(state["startup"]["message"])
+    
+    if target_chars > msg_len:
+        # Animation complete, wait 2 seconds then go to default mode
+        if elapsed > (msg_len * state["startup"]["char_delay"]) + 2.0:
+            print(f"Startup complete, moving to {state.get('default_mode', 'FACE')}")
+            default = state.get("default_mode", "FACE")
+            state["current_mode"] = default
+            # If face, ensure it's loaded
+            if default == "FACE":
+                load_random_face(state)
+            state["needs_redraw"] = True
+    else:
+        if target_chars != state["startup"]["char_index"]:
+            state["startup"]["char_index"] = target_chars
+            state["needs_redraw"] = True
+
+def draw_startup(screen, state):
+    screen.fill(config.BLACK) # Using BLACK for startup contrast
+    
+    # Draw partial message (typewriter effect)
+    message = state["startup"]["message"]
+    visible_text = message[:state["startup"]["char_index"]]
+    
+    # Word wrap
+    words = visible_text.split(' ')
+    lines = []
+    line = []
+    for w in words:
+        line.append(w)
+        if config.FONT_MEDIUM.size(' '.join(line))[0] > config.WIDTH - 40:
+            line.pop()
+            lines.append(' '.join(line))
+            line = [w]
+    lines.append(' '.join(line))
+    
+    # Draw lines
+    y = config.HEIGHT // 2 - (len(lines) * 30) // 2
+    for l in lines:
+        if l.strip():
+            surf = config.FONT_MEDIUM.render(l, False, config.WHITE) # WHITE text on BLACK
+            screen.blit(surf, (config.WIDTH//2 - surf.get_width()//2, y))
+        y += 30
+    
+    # Blinking cursor
+    if state["startup"]["char_index"] < len(message):
+        if int(time.time() * 2) % 2 == 0:  # Blink every 0.5s
+            cursor = config.FONT_MEDIUM.render("_", False, config.WHITE)
+            # Position cursor at end of last line
+            last_line_content = lines[-1] if lines else ""
+            last_line_surf = config.FONT_MEDIUM.render(last_line_content, False, config.WHITE)
+            cursor_x = config.WIDTH//2 - last_line_surf.get_width()//2 + last_line_surf.get_width()
+            cursor_y = y - 30
+            screen.blit(cursor, (cursor_x, cursor_y))
 
