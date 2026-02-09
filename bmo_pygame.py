@@ -1647,6 +1647,15 @@ def main():
                             # Tapping outside buttons while UI is up hides it
                             state["needs"]["show_interaction"] = False
                     else:
+                        # Shortcut for messages notification (bottom right "!")
+                        if state["messages"]["unread"] and x > WIDTH - 60 and y > HEIGHT - 60:
+                            if state["messages"]["list"]:
+                                # Open the most recent message
+                                state["messages"]["viewing_id"] = state["messages"]["list"][0]["id"]
+                                state["messages"]["unread"] = False
+                                state["mode"] = "MESSAGE_VIEW"
+                                continue
+
                         # Normal face tap -> Menu
                         state["mode"] = "MENU"
                         state["menu_stack"] = ["MAIN"]
