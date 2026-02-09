@@ -356,6 +356,13 @@ def main():
                          state["cursor_visible"] = False
                          state["needs_redraw"] = True
 
+            # --- VISUAL FEEDBACK (CHECK) ---
+            click_time = state.get("click_feedback", {}).get("time", 0)
+            is_showing_feedback = (current_time - click_time < 0.5)
+            
+            if is_showing_feedback:
+                 state["needs_redraw"] = True
+
             # --- REDRAW LOGIC ---
             if state["needs_redraw"]:
                 
@@ -399,19 +406,20 @@ def main():
                     if state.get("snake"):
                         state["snake"].draw(screen)
                 
-                # --- VISUAL FEEDBACK (CROSS) ---
-                # Draw a cross where the user clicked for 1 second
-                click_time = state.get("click_feedback", {}).get("time", 0)
-                if current_time - click_time < 0.5: # 0.5s visible
+                # --- VISUAL FEEDBACK (DRAW) ---
+                if is_showing_feedback:
                     cx, cy = state["click_feedback"]["pos"]
                     # Draw Cross
-                    color = (255, 255, 255) # White
+                    # White cross with black outline for visibility on light backgrounds
                     size = 10
-                    pygame.draw.line(screen, color, (cx - size, cy), (cx + size, cy), 2)
-                    pygame.draw.line(screen, color, (cx, cy - size), (cx, cy + size), 2)
                     
-                    # Force redraw while feedback is visible
-                    state["needs_redraw"] = True
+                    # Outline (Black)
+                    pygame.draw.line(screen, (0,0,0), (cx - size, cy), (cx + size, cy), 4)
+                    pygame.draw.line(screen, (0,0,0), (cx, cy - size), (cx, cy + size), 4)
+
+                    # Main Cross (White)
+                    pygame.draw.line(screen, (255,255,255), (cx - size, cy), (cx + size, cy), 2)
+                    pygame.draw.line(screen, (255,255,255), (cx, cy - size), (cx, cy + size), 2)
                 
                 # Push to Framebuffer
                 display.update_framebuffer(screen)
