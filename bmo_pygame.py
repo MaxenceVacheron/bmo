@@ -644,9 +644,13 @@ def start_slideshow(subdir):
     state["slideshow"]["images"] = []
     
     if os.path.exists(path):
-        for f in os.listdir(path):
-            if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp')):
-                state["slideshow"]["images"].append(os.path.join(path, f))
+        try:
+            for f in os.listdir(path):
+                if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp')):
+                    state["slideshow"]["images"].append(os.path.join(path, f))
+        except (OSError, IOError) as e:
+            print(f"Error accessing slideshow path {path}: {e}")
+            state["slideshow"]["images"] = []
     
     if not state["slideshow"]["images"]:
         state["slideshow"]["images"] = ["PLACEHOLDER_EMPTY"]
@@ -723,9 +727,12 @@ def start_gif_player(subdir):
     
     # Scan for GIFs
     if os.path.exists(path):
-        for f in os.listdir(path):
-            if f.lower().endswith('.gif'):
-                state["gif_player"]["gifs"].append(os.path.join(path, f))
+        try:
+            for f in os.listdir(path):
+                if f.lower().endswith('.gif'):
+                    state["gif_player"]["gifs"].append(os.path.join(path, f))
+        except (OSError, IOError) as e:
+            print(f"Error accessing GIF path {path}: {e}")
     
     if not state["gif_player"]["gifs"]:
         print(f"No GIFs found in {path}")
@@ -743,11 +750,17 @@ def start_gif_player(subdir):
 def trigger_random_gif():
     """Select and play a random GIF for a short time"""
     all_gifs = []
+    all_gifs = []
     # Scan recursively for GIFs in Nextcloud path
-    for root, dirs, files in os.walk(NEXTCLOUD_PATH):
-        for f in files:
-            if f.lower().endswith('.gif'):
-                all_gifs.append(os.path.join(root, f))
+    try:
+        if os.path.exists(NEXTCLOUD_PATH):
+            for root, dirs, files in os.walk(NEXTCLOUD_PATH):
+                for f in files:
+                    if f.lower().endswith('.gif'):
+                        all_gifs.append(os.path.join(root, f))
+    except (OSError, IOError) as e:
+        print(f"Error walking Nextcloud path: {e}")
+        return
     
     if not all_gifs: return
     
