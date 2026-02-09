@@ -393,7 +393,7 @@ def fetch_remote_messages():
     """Background thread for periodic fetch"""
     while True:
         sync_messages()
-        time.sleep(300)
+        time.sleep(60)
 
 # --- SYSTEM STATS ---
 def get_cpu_temp():
@@ -756,11 +756,18 @@ def trigger_random_gif():
     # Reuse GIF player logic but with specific mode
     state["gif_player"]["gifs"] = [chosen]
     state["gif_player"]["current_gif_index"] = 0
-    load_next_gif()
+    state["gif_player"]["frames"] = [] # Clear previous frames
     
-    if not state["gif_player"]["frames"]:
+    # Load frames immediately
+    frames, duration = _load_gif_frames(chosen)
+    if not frames:
         print("⚠️ Random GIF load failed (no frames)")
         return
+
+    state["gif_player"]["frames"] = frames
+    state["gif_player"]["frame_duration"] = duration
+    state["gif_player"]["frame_index"] = 0
+    state["gif_player"]["frame_start_time"] = time.time()
 
     print(f"🎬 Starting Random GIF Mode with {len(state['gif_player']['frames'])} frames")
     
