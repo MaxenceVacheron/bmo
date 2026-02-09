@@ -45,6 +45,15 @@ git reset --hard HEAD
 sudo systemctl daemon-reload
 sudo systemctl restart bmo.service
 echo "✅ Service restarted!"
+
+# Update WiFi Config if present
+if [ -f "/home/pi/bmo/wpa_supplicant.conf" ]; then
+    echo "📶 Updating WiFi configuration..."
+    sudo cp /home/pi/bmo/wpa_supplicant.conf /etc/wpa_supplicant/wpa_supplicant.conf
+    sudo chmod 600 /etc/wpa_supplicant/wpa_supplicant.conf
+    sudo wpa_cli -i wlan0 reconfigure
+    echo "✅ WiFi configuration updated!"
+fi
 EOF
 
 echo "🎉 Deployment Complete!"
