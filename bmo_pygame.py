@@ -1561,10 +1561,6 @@ def draw_message_view(screen):
     elapsed = now - start_t
     chars_to_show = int(elapsed * 30) # 30 chars per second
     
-    # DEBUG TYPEWRITER (Aggressive)
-    print(f"DEBUG: start_t={start_t}, now={now}, elapsed={elapsed:.2f}, chars={chars_to_show}, len={len(content)}")
-    sys.stdout.flush()
-    
     visible_content = content[:chars_to_show]
     if chars_to_show < len(content):
         visible_content += "_" # Blinking cursor concept
@@ -1999,7 +1995,7 @@ def main():
         
         # --- UPDATE PHASE ---
         now = time.time()
-        always_update = state["mode"] in ["SNAKE", "GIF_PLAYER", "STARTUP", "SLIDESHOW", "CLOCK", "ADVANCED_STATS", "FOCUS", "HEART", "MESSAGE_VIEW"]
+        always_update = state["mode"] in ["SNAKE", "GIF_PLAYER", "STARTUP", "SLIDESHOW", "CLOCK", "ADVANCED_STATS", "FOCUS", "HEART", "MESSAGE_VIEW", "RANDOM_GIF"]
         
         # Inactivity Check
         if state["mode"] in ["MENU", "STATS", "CLOCK", "NOTES", "HEART", "SETTINGS", "GAMES"]:
@@ -2022,7 +2018,7 @@ def main():
             update_startup()
         elif state["mode"] == "SLIDESHOW":
             update_slideshow()
-        elif state["mode"] == "GIF_PLAYER":
+        elif state["mode"] == "GIF_PLAYER" or state["mode"] == "RANDOM_GIF":
             update_gif()
         elif state["mode"] == "SNAKE":
             if state["snake"] is None:
