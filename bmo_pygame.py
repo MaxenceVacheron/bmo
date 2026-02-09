@@ -1999,7 +1999,7 @@ def main():
         
         # --- UPDATE PHASE ---
         now = time.time()
-        always_update = state["mode"] in ["SNAKE", "GIF_PLAYER", "STARTUP", "SLIDESHOW", "CLOCK", "ADVANCED_STATS", "FOCUS", "HEART"]
+        always_update = state["mode"] in ["SNAKE", "GIF_PLAYER", "STARTUP", "SLIDESHOW", "CLOCK", "ADVANCED_STATS", "FOCUS", "HEART", "MESSAGE_VIEW"]
         
         # Inactivity Check
         if state["mode"] in ["MENU", "STATS", "CLOCK", "NOTES", "HEART", "SETTINGS", "GAMES"]:
