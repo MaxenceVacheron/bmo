@@ -101,16 +101,18 @@ LOVE_NOTES = [
 # --- MENUS DEFINITION ---
 MENUS = {
     "MAIN": [
-        {"label": "FACE", "action": "MODE:FACE", "color": TEAL},
-        {"label": "FOCUS", "action": "MENU:FOCUS", "color": GREEN}, # New Focus Menu
-        {"label": "NEXTCLOUD", "action": "MENU:NEXTCLOUD", "color": BLUE},
-        {"label": "GAMES", "action": "MENU:GAMES", "color": YELLOW},
-        {"label": "CLOCK", "action": "MODE:CLOCK", "color": BLUE},
-        {"label": "WEATHER", "action": "MODE:WEATHER", "color": BLUE},
+        {"label": "HOME", "action": "MODE:FACE", "color": TEAL},
         {"label": "MESSAGES", "action": "MODE:MESSAGES", "color": PINK},
+        {"label": "WEATHER", "action": "MODE:WEATHER", "color": BLUE},
+        {"label": "CLOCK", "action": "MODE:CLOCK", "color": BLUE},
+        # Page 2
+        {"label": "FOCUS", "action": "MENU:FOCUS", "color": GREEN},
+        {"label": "GAMES", "action": "MENU:GAMES", "color": YELLOW},
         {"label": "SYSTEM", "action": "MODE:ADVANCED_STATS", "color": GRAY},
         {"label": "NOTES", "action": "MODE:NOTES", "color": RED},
+        # Page 3
         {"label": "HEART", "action": "MODE:HEART", "color": PINK},
+        {"label": "NEXTCLOUD", "action": "MENU:NEXTCLOUD", "color": BLUE},
         {"label": "SETTINGS", "action": "MENU:SETTINGS", "color": GRAY},
     ],
     "GAMES": [
