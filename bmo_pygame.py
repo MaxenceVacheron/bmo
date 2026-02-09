@@ -1560,6 +1560,10 @@ def draw_message_view(screen):
     elapsed = time.time() - start_t
     chars_to_show = int(elapsed * 30) # 30 chars per second
     
+    # DEBUG TYPEWRITER
+    if random.random() < 0.05: # Limit spam
+        print(f"DEBUG: elapsed={elapsed:.2f}, chars={chars_to_show}, len={len(content)}")
+    
     visible_content = content[:chars_to_show]
     if chars_to_show < len(content):
         visible_content += "_" # Blinking cursor concept
