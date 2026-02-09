@@ -54,6 +54,17 @@ if [ -f "/home/pi/bmo/wpa_supplicant.conf" ]; then
     sudo wpa_cli -i wlan0 reconfigure
     echo "✅ WiFi configuration updated!"
 fi
+
+# Setup WiFi Check Cron Job
+echo "🕒 Setting up WiFi check cron job..."
+chmod +x /home/pi/bmo/wifi_check.sh
+if ! sudo crontab -l 2>/dev/null | grep -F "wifi_check.sh"; then
+    (sudo crontab -l 2>/dev/null; echo "* * * * * /home/pi/bmo/wifi_check.sh >> /var/log/wifi_check.cron.log 2>&1") | sudo crontab -
+    echo "✅ Cron job installed!"
+else
+    echo "ℹ️ Cron job already exists."
+fi
+
 EOF
 
 echo "🎉 Deployment Complete!"
