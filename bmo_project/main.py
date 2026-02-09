@@ -182,8 +182,8 @@ def main():
                                 media.start_slideshow(state, subdir)
                             
                             elif action.startswith("GIF:"):
-                                 # Map GIF to Slideshow logic or ignore for now
-                                 pass
+                                subdir = action.split(":")[1]
+                                media.start_gif_player(state, subdir)
                                  
                             elif action.startswith("SYSTEM:"):
                                 cmd = action.split(":")[1]
@@ -227,6 +227,8 @@ def main():
                     elif mode == "SLIDESHOW":
                          # Exit slideshow on tap
                          state["current_mode"] = "MENU"
+                    elif mode == "GIF_PLAYER":
+                        media.handle_gif_touch(state, pos)
                     elif mode == "FOCUS":
                          # Exit focus on tap (if finished)
                          if state["focus"].get("active") == False:
@@ -240,6 +242,8 @@ def main():
                 core_modes.update_face(state)
             elif state["current_mode"] == "SLIDESHOW":
                 media.update_slideshow(state)
+            elif state["current_mode"] == "GIF_PLAYER":
+                media.update_gif(state)
             elif state["current_mode"] == "SNAKE":
                  if state.get("snake"):
                      state["snake"].update()
@@ -294,6 +298,8 @@ def main():
                     apps.draw_focus(screen, state)
                 elif state["current_mode"] == "SLIDESHOW":
                     media.draw_slideshow(screen, state)
+                elif state["current_mode"] == "GIF_PLAYER":
+                    media.draw_gif(screen, state)
                 elif state["current_mode"] == "SNAKE":
                     if state.get("snake"):
                         state["snake"].draw(screen)

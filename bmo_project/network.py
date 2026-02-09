@@ -75,6 +75,9 @@ def sync_messages(state):
 def send_read_receipt(msg_id):
     """Notify the API that a message has been read"""
     try:
+        print(f"👀 Sending read receipt for message ID: {msg_id}")
+        sys.stdout.flush()
+        
         # Add +1h (3600s) to match server expectation? 
         # Server expects "read_at". Let's use current time.
         read_time = int(time.time())
@@ -91,12 +94,19 @@ def send_read_receipt(msg_id):
         
         with urllib.request.urlopen(req, timeout=5) as response:
             if response.status == 200:
-                print(f"✅ Read receipt sent for {msg_id}")
+                print(f"✅ Read receipt sent successfully for {msg_id}")
             else:
-                print(f"⚠️ Failed to send receipt for {msg_id}: {response.status}")
+                print(f"⚠️ Failed to send receipt for {msg_id}. Status: {response.status}")
+                try: print(response.read().decode())
+                except: pass
+        sys.stdout.flush()
+    except urllib.error.HTTPError as e:
+        print(f"❌ HTTP Error sending receipt for {msg_id}: {e.code} - {e.reason}")
+        try: print(e.read().decode())
+        except: pass
         sys.stdout.flush()
     except Exception as e:
-        print(f"Receipt Error: {e}")
+        print(f"❌ Error sending read receipt: {e}")
         sys.stdout.flush()
 
 def send_message(recipient, content):

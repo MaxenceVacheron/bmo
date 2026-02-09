@@ -1,5 +1,6 @@
 import pygame
 import time
+import threading
 from .. import config
 from .. import ui_core
 from .. import network
@@ -266,17 +267,21 @@ def handle_touch(state, pos):
             msg = msgs[real_idx]
             msg["read"] = True # Mark read
             
-            # Init Typewriter View
+            # Send Read Receipt
+            threading.Thread(target=network.send_read_receipt, args=(msg["id"],), daemon=True).start()
+            
+            # Init Typewriter View (Boot Style)
             state["message_view"] = {
                 "msg": msg,
-                "char_count": 0,
-                "last_update": time.time(),
-                "scroll_y": 0
+                "start_time": time.time(),
+                "char_delay": 0.05, # Fast typing
+                "scroll_y": 0,
+                "char_index": 0
             }
             state["current_mode"] = "MESSAGE_VIEW"
 
 def draw_message_view(screen, state):
-    screen.fill(config.WHITE)
+    screen.fill(config.BLACK) # Boot style: Black BG
     
     if "message_view" not in state or not state["message_view"].get("msg"):
         state["current_mode"] = "MESSAGES"
@@ -284,78 +289,73 @@ def draw_message_view(screen, state):
 
     msg = state["message_view"]["msg"]
     sender = msg.get("sender", "Unknown").upper()
-    content = msg.get("content", "")
+    full_content = msg.get("content", "")
     ts = msg.get("timestamp", 0)
     time_str = time.strftime("%H:%M %d/%m", time.localtime(ts)) if ts else ""
     
-    # Header
-    pygame.draw.rect(screen, config.TEAL, (0, 0, config.WIDTH, 60))
+    # Construct the full text to display
+    display_text = f"FROM: {sender}\nTIME: {time_str}\n\n{full_content}"
     
-    s_lbl = config.FONT_MEDIUM.render(f"FROM: {sender}", True, config.WHITE)
-    t_lbl = config.FONT_SMALL.render(time_str, True, config.WHITE)
+    # Calculate visible chars based on elapsed time (Boot Logic)
+    elapsed = time.time() - state["message_view"]["start_time"]
+    target_chars = int(elapsed / state["message_view"]["char_delay"])
     
-    screen.blit(s_lbl, (20, 10))
-    screen.blit(t_lbl, (20, 35))
+    if target_chars > len(display_text):
+         target_chars = len(display_text)
+         state["message_view"]["char_index"] = target_chars
+    else:
+         if target_chars != state["message_view"].get("char_index", 0):
+             state["message_view"]["char_index"] = target_chars
+             state["needs_redraw"] = True
     
-    # Typewriter Effect
-    # Increase char count 
-    # Speed: 30 chars per sec?
-    # We rely on frame redraw (approx 30fps) or time delta?
-    # Let's use time delta for consistency
-    now = time.time()
-    dt = now - state["message_view"]["last_update"]
-    state["message_view"]["last_update"] = now
+    visible_text = display_text[:target_chars]
     
-    # Add chars (approx 50 chars/sec)
-    state["message_view"]["char_count"] += 50 * dt
-    
-    visible_chars = int(state["message_view"]["char_count"])
-    if visible_chars > len(content):
-        visible_chars = len(content)
-        
-    text_to_show = content[:visible_chars]
-    
-    # Render Text with Wrap
-    y = 80
-    margin = 20
-    max_w = config.WIDTH - 2 * margin
-    
-    words = text_to_show.split(' ')
-    # Split content by newlines first to preserve paragraph structure?
-    # Simple wrap:
+    # Word Wrap & Render
     lines = []
-    line = []
     
-    # Handle newlines explicitly
-    paragraphs = text_to_show.split('\n')
-    
+    # Handle Newlines
+    paragraphs = visible_text.split('\n')
     for p in paragraphs:
         if not p:
             lines.append("")
             continue
-            
-        p_words = p.split(' ')
-        for w in p_words:
+        
+        words = p.split(' ')
+        line = []
+        for w in words:
             line.append(w)
-            if config.FONT_MEDIUM.size(' '.join(line))[0] > max_w:
+            if config.FONT_MEDIUM.size(' '.join(line))[0] > config.WIDTH - 40:
                 line.pop()
                 lines.append(' '.join(line))
                 line = [w]
         if line:
             lines.append(' '.join(line))
-            line = []
-            
-    # Draw Lines
+    
+    # Draw Lines (Centered Vertically if short, or top down if long?)
+    # Boot style was centered. Let's stick to top-down for readability of long messages
+    y = 40
     for l in lines:
-        surf = config.FONT_MEDIUM.render(l, True, config.BLACK)
-        screen.blit(surf, (margin, y))
-        y += 30
+        if l.strip():
+            surf = config.FONT_MEDIUM.render(l, False, config.WHITE)
+            screen.blit(surf, (20, y))
+        y += 35
         
-    # Force Redraw if still typing
-    if visible_chars < len(content):
-        state["needs_redraw"] = True
-        
-    # Buttons
+    # Blinking Cursor at end
+    if target_chars < len(display_text):
+        if int(time.time() * 2) % 2 == 0:
+            cursor = config.FONT_MEDIUM.render("_", False, config.WHITE)
+            # Find position of last char
+            last_line = lines[-1] if lines else ""
+            txt_surf = config.FONT_MEDIUM.render(last_line, False, config.WHITE)
+            cx = 20 + txt_surf.get_width()
+            cy = y - 35
+            screen.blit(cursor, (cx, cy))
+            state["needs_redraw"] = True
+            
+    # Draw Buttons only when finished typing? Or always?
+    # Boot style implies automated, but this is interactive.
+    # Let's show buttons at bottom
+    
     # BACK (Bottom Left)
     pygame.draw.rect(screen, config.GRAY, (20, config.HEIGHT - 50, 80, 40), border_radius=5)
     lbl = config.FONT_SMALL.render("BACK", True, config.WHITE)
@@ -376,10 +376,15 @@ def handle_message_view_touch(state, pos):
         
     # REPLY
     if x > config.WIDTH - 110 and y > config.HEIGHT - 60:
-        # Pre-fill recipient
         state["composing"] = True
-        state["keyboard"] = T9Keyboard()
+        state["keyboard"] = messages.T9Keyboard() # Fix: use messages. or just T9Keyboard if in same file
         msg = state["message_view"]["msg"]
         state["keyboard"].recipient = msg.get("sender", "AMO")
-        state["current_mode"] = "MESSAGES" # Go back to list but in compose mode
+        state["current_mode"] = "MESSAGES" 
         return
+    
+    # Tap elsewhere to speed up?
+    if y < config.HEIGHT - 60:
+         # Instant finish
+         state["message_view"]["start_time"] = 0 # Forces large elapsed
+         state["needs_redraw"] = True

@@ -101,3 +101,138 @@ def draw_slideshow(screen, state):
         hint_right = config.FONT_SMALL.render(">", True, config.WHITE)
         screen.blit(hint_left, (10, config.HEIGHT - 30))
         screen.blit(hint_right, (config.WIDTH - 30, config.HEIGHT - 30))
+
+# --- GIF PLAYER ---
+import random
+
+def start_gif_player(state, subdir):
+    path = os.path.join(config.NEXTCLOUD_PATH, subdir, "Photos", "GIFs")
+    if "gif_player" not in state: state["gif_player"] = {}
+    
+    state["gif_player"]["path"] = path
+    state["gif_player"]["gifs"] = []
+    
+    if os.path.exists(path):
+        try:
+            for f in os.listdir(path):
+                if f.lower().endswith('.gif'):
+                    state["gif_player"]["gifs"].append(os.path.join(path, f))
+        except (OSError, IOError) as e:
+            print(f"Error accessing GIF path {path}: {e}")
+    
+    if not state["gif_player"]["gifs"]:
+        print(f"No GIFs found in {path}")
+        state["current_mode"] = "MENU"
+        return
+
+    random.shuffle(state["gif_player"]["gifs"])
+    state["gif_player"]["current_gif_index"] = 0
+    state["gif_player"]["gif_switch_time"] = time.time()
+    state["gif_player"]["next_frames"] = [] # Clear preload
+    
+    load_next_gif(state)
+    state["current_mode"] = "GIF_PLAYER"
+
+def _load_gif_frames(gif_path):
+    frames = []
+    duration = 0.1
+    try:
+        pil_gif = Image.open(gif_path)
+        try:
+            duration = pil_gif.info.get('duration', 100) / 1000.0
+        except:
+            duration = 0.1
+        
+        frame_num = 0
+        while True:
+            try:
+                pil_gif.seek(frame_num)
+                frame = pil_gif.convert('RGB')
+                
+                img_w, img_h = frame.size
+                scale = min(config.WIDTH / img_w, config.HEIGHT / img_h)
+                new_size = (int(img_w * scale), int(img_h * scale))
+                frame = frame.resize(new_size, Image.Resampling.NEAREST)
+                
+                mode = frame.mode
+                size = frame.size
+                data = frame.tobytes()
+                pygame_frame = pygame.image.fromstring(data, size, mode)
+                frames.append(pygame_frame)
+                frame_num += 1
+            except EOFError:
+                break
+    except Exception as e:
+        print(f"Error loading GIF: {e}")
+    return frames, duration
+
+def load_next_gif(state):
+    gifs = state["gif_player"].get("gifs")
+    if not gifs: return
+    
+    if state["gif_player"].get("next_frames"):
+        state["gif_player"]["frames"] = state["gif_player"]["next_frames"]
+        state["gif_player"]["frame_duration"] = state["gif_player"]["next_frame_duration"]
+        state["gif_player"]["frame_index"] = 0
+        state["gif_player"]["next_frames"] = []
+    else:
+        gif_path = gifs[state["gif_player"]["current_gif_index"]]
+        frames, duration = _load_gif_frames(gif_path)
+        state["gif_player"]["frames"] = frames
+        state["gif_player"]["frame_duration"] = duration
+        state["gif_player"]["frame_index"] = 0
+        state["gif_player"]["last_frame_time"] = time.time()
+    
+    preload_next_gif(state)
+
+def preload_next_gif(state):
+    gifs = state["gif_player"].get("gifs")
+    if not gifs or len(gifs) <= 1: return
+    
+    next_index = (state["gif_player"]["current_gif_index"] + 1) % len(gifs)
+    next_gif_path = gifs[next_index]
+    frames, duration = _load_gif_frames(next_gif_path)
+    state["gif_player"]["next_frames"] = frames
+    state["gif_player"]["next_frame_duration"] = duration
+
+def update_gif(state):
+    if "gif_player" not in state: return
+    
+    # Switch GIF every 15s
+    if time.time() - state["gif_player"].get("gif_switch_time", 0) > 15.0:
+        gifs = state["gif_player"].get("gifs")
+        if gifs:
+            state["gif_player"]["current_gif_index"] = (state["gif_player"]["current_gif_index"] + 1) % len(gifs)
+            state["gif_player"]["gif_switch_time"] = time.time()
+            load_next_gif(state)
+            
+    # Animate
+    if time.time() - state["gif_player"].get("last_frame_time", 0) > state["gif_player"].get("frame_duration", 0.1):
+        state["gif_player"]["last_frame_time"] = time.time()
+        frames = state["gif_player"].get("frames")
+        if frames:
+            state["gif_player"]["frame_index"] = (state["gif_player"]["frame_index"] + 1) % len(frames)
+            state["needs_redraw"] = True
+
+def draw_gif(screen, state):
+    if not state.get("gif_player"): return
+    screen.fill(config.BLACK)
+    
+    frames = state["gif_player"].get("frames")
+    if not frames:
+        txt = config.FONT_MEDIUM.render("No GIF loaded", True, config.WHITE)
+        screen.blit(txt, (config.WIDTH//2 - txt.get_width()//2, config.HEIGHT//2))
+        return
+
+    idx = state["gif_player"]["frame_index"] % len(frames)
+    frame = frames[idx]
+    x = (config.WIDTH - frame.get_width()) // 2
+    y = (config.HEIGHT - frame.get_height()) // 2
+    screen.blit(frame, (x, y))
+
+    # Hints
+    if time.time() - state["gif_player"].get("last_touch_time", 0) < 1.0:
+        hint_left = config.FONT_SMALL.render("<", True, config.WHITE)
+        hint_right = config.FONT_SMALL.render(">", True, config.WHITE)
+        screen.blit(hint_left, (10, config.HEIGHT - 30))
+        screen.blit(hint_right, (config.WIDTH - 30, config.HEIGHT - 30))
