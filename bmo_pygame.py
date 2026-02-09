@@ -291,7 +291,8 @@ state = {
         "list": [],
         "unread": False,
         "selected_index": 0,
-        "viewing_id": None
+        "viewing_id": None,
+        "view_start_time": 0
     }
 }
 
@@ -1544,9 +1545,20 @@ def draw_message_view(screen):
     date_surf = FONT_TINY.render(formatted_date, False, GRAY)
     screen.blit(date_surf, (WIDTH - 20 - date_surf.get_width(), 10))
     
-    # Word wrap content centered vertically
+    # Typewriter Effect
     content = msg.get("content", "")
-    words = content.split(' ')
+    
+    # Calculate visible chars based on time
+    start_t = state["messages"].get("view_start_time", 0)
+    elapsed = time.time() - start_t
+    chars_to_show = int(elapsed * 30) # 30 chars per second
+    
+    visible_content = content[:chars_to_show]
+    if chars_to_show < len(content):
+        visible_content += "_" # Blinking cursor concept
+        state["needs_redraw"] = True # Keep redrawing while typing
+    
+    words = visible_content.split(' ')
     lines = []
     line = []
     max_w = WIDTH - 60
@@ -1789,6 +1801,7 @@ def main():
                                 msg_id = state["messages"]["list"][0]["id"]
                                 state["messages"]["viewing_id"] = msg_id
                                 state["messages"]["unread"] = False
+                                state["messages"]["view_start_time"] = time.time()
                                 state["mode"] = "MESSAGE_VIEW"
                                 # Send read receipt
                                 threading.Thread(target=send_read_receipt, args=(msg_id,), daemon=True).start()
@@ -1953,6 +1966,7 @@ def main():
                         if real_idx < len(state["messages"]["list"]):
                             msg_id = state["messages"]["list"][real_idx]["id"]
                             state["messages"]["viewing_id"] = msg_id
+                            state["messages"]["view_start_time"] = time.time()
                             state["mode"] = "MESSAGE_VIEW"
                             # Send read receipt
                             threading.Thread(target=send_read_receipt, args=(msg_id,), daemon=True).start()
