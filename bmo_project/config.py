@@ -21,7 +21,7 @@ else:
 
 # Unified Paths
 os.makedirs(BASE_DIR, exist_ok=True)
-NEXTCLOUD_PATH = os.path.join(BASE_DIR, "nextcloud_mock" if IS_WINDOWS else "mnt/nextcloud/shr/BMO_Agnes")
+NEXTCLOUD_PATH = os.path.join(BASE_DIR, "nextcloud_mock") if IS_WINDOWS else "/home/pi/mnt/nextcloud/shr/BMO_Agnes"
 CONFIG_FILE = os.path.join(BASE_DIR, "bmo_config.json")
 BMO_FACES_ROOT = os.path.join(BASE_DIR, "bmo_faces")
 IDLE_THOUGHT_DIR = os.path.join(BASE_DIR, "idle_thought" if IS_WINDOWS else "bmo_assets/idle/thought")
