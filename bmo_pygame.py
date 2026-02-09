@@ -726,9 +726,6 @@ def start_gif_player(subdir):
     state["gif_player"]["current_gif_index"] = 0
     state["gif_player"]["gif_switch_time"] = time.time()
     load_next_gif()
-    state["gif_player"]["current_gif_index"] = 0
-    state["gif_player"]["gif_switch_time"] = time.time()
-    load_next_gif()
     state["mode"] = "GIF_PLAYER"
 
 def trigger_random_gif():
@@ -1711,7 +1708,7 @@ def main():
         # Random GIF Mode Handling
         if state["mode"] == "RANDOM_GIF":
              # Draw GIF
-            draw_gif_player(screen)
+            draw_gif(screen)
             
             # Check duration (5 seconds)
             if current_time - state["random_gif"]["start_time"] > 5:
