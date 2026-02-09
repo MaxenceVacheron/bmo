@@ -269,7 +269,7 @@ def main():
                          # Exit focus on tap (if finished)
                          if state["focus"].get("active") == False:
                              state["current_mode"] = "MENU"
-                    elif mode == "WEATHER" or mode == "ADVANCED_STATS" or mode == "NOTES":
+                    elif mode == "WEATHER" or mode == "ADVANCED_STATS" or mode == "NOTES" or mode == "CLOCK":
                          # Simple back on tap
                          state["current_mode"] = "MENU"
             

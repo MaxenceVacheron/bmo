@@ -247,6 +247,37 @@ def draw_gif(screen, state):
         screen.blit(hint_left, (10, config.HEIGHT - 30))
         screen.blit(hint_right, (config.WIDTH - 30, config.HEIGHT - 30))
 
+        screen.blit(hint_right, (config.WIDTH - 30, config.HEIGHT - 30))
+
+def handle_gif_touch(state, pos):
+    if "gif_player" not in state: return
+    
+    x, y = pos
+    width = config.WIDTH
+    
+    state["gif_player"]["last_touch_time"] = time.time()
+    
+    # Navigation
+    if x < width // 3:
+        # Prev
+        gifs = state["gif_player"].get("gifs")
+        if gifs:
+            state["gif_player"]["current_gif_index"] = (state["gif_player"]["current_gif_index"] - 1) % len(gifs)
+            state["gif_player"]["gif_switch_time"] = time.time() # Reset auto-switch timer
+            load_next_gif(state)
+            
+    elif x > 2 * width // 3:
+        # Next
+        gifs = state["gif_player"].get("gifs")
+        if gifs:
+            state["gif_player"]["current_gif_index"] = (state["gif_player"]["current_gif_index"] + 1) % len(gifs)
+            state["gif_player"]["gif_switch_time"] = time.time()
+            load_next_gif(state)
+            
+    else:
+        # Center -> Exit
+        state["current_mode"] = "MENU"
+
 def trigger_random_gif(state):
     print("🎲 Triggering Random GIF...")
     # Search in both default and perso

@@ -149,6 +149,7 @@ def update_face(state):
     
     if now - state["last_face_switch"] > interval:
         print(f"Rotating face image (Emotion: {state.get('emotion')}, Interval: {interval}s)...")
+        state["last_face_switch"] = now # Update immediately to prevent spam if load fails/empty
         load_random_face(state)
     
     # Blinking logic (decreased frequency: 8-20 seconds)
@@ -422,6 +423,10 @@ def draw_clock(screen, state):
     lbl_d = config.FONT_MEDIUM.render(d, True, config.WHITE)
     screen.blit(lbl_t, (config.WIDTH//2 - lbl_t.get_width()//2, 100))
     screen.blit(lbl_d, (config.WIDTH//2 - lbl_d.get_width()//2, 180))
+    
+    # Back Hint
+    hint = config.FONT_TINY.render("< TAP TO BACK", True, config.WHITE)
+    screen.blit(hint, (20, config.HEIGHT - 20))
 
 def draw_stats(screen, state):
     # Placeholder for system stats

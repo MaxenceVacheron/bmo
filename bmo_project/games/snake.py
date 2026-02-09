@@ -28,12 +28,17 @@ class SnakeGame:
                 return (x, y)
                 
     def handle_input(self, pos):
+        x, y = pos
+        
+        # Explicit Exit Button (Top Right)
+        if x > self.width - 40 and y < 40:
+            return "EXIT"
+
         if self.game_over:
-            # Tap to exit
+            # Tap anywhere to exit
             return "EXIT"
 
         # Divide screen into 4 triangles for direction
-        x, y = pos
         # Calculate relative to center
         rx = x - self.width // 2
         ry = y - self.height // 2
@@ -101,9 +106,16 @@ class SnakeGame:
             color = (44, 62, 80) if i == 0 else (52, 73, 94)
             pygame.draw.rect(screen, color, (x+1, y+1, self.grid_size-2, self.grid_size-2))
             
+        # UI LAYER
         # Score
         score_txt = config.FONT_SMALL.render(f"SCORE: {self.score}", True, config.WHITE)
         screen.blit(score_txt, (10, 10))
+        
+        # Exit Button (Top Right)
+        pygame.draw.rect(screen, config.RED, (self.width-35, 5, 30, 30), border_radius=5)
+        # Draw X
+        pygame.draw.line(screen, config.WHITE, (self.width-30, 10), (self.width-10, 30), 2)
+        pygame.draw.line(screen, config.WHITE, (self.width-30, 30), (self.width-10, 10), 2)
         
         # Back Hint
         if not self.game_over:
