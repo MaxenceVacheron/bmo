@@ -1,27 +1,51 @@
 import os
+import sys
 import json
 import pygame
 
 # --- CONFIGURATION ---
 WIDTH, HEIGHT = 480, 320
-FB_DEVICE = "/dev/fb1"
-TOUCH_DEVICE = "/dev/input/event4" # SPI-connected touch panel on CS1
-NEXTCLOUD_PATH = "/home/pi/mnt/nextcloud/shr/BMO_Agnes"
-CONFIG_FILE = "/home/pi/bmo/bmo_config.json"
-BMO_FACES_ROOT = "/home/pi/bmo/bmo_faces"
-IDLE_THOUGHT_DIR = "/home/pi/bmo/bmo_assets/idle/thought"
-MESSAGES_FILE = "/home/pi/bmo/messages.json"
+
+# Detect Environment
+IS_RASPBERRY_PI = os.uname().sysname == 'Linux' and 'arm' in os.uname().machine if hasattr(os, 'uname') else False
+IS_WINDOWS = sys.platform.startswith('win')
+
+if IS_WINDOWS:
+    # Local Development Paths (Relative to project root or user home)
+    # Using a local 'bmo_data' folder in the current directory or user home
+    BASE_DIR = os.path.join(os.getcwd(), "bmo_data")
+    os.makedirs(BASE_DIR, exist_ok=True)
+    
+    FB_DEVICE = None # No framebuffer on Windows
+    TOUCH_DEVICE = None # Mouse simulation
+    
+    NEXTCLOUD_PATH = os.path.join(BASE_DIR, "nextcloud_mock")
+    CONFIG_FILE = os.path.join(BASE_DIR, "bmo_config.json")
+    BMO_FACES_ROOT = os.path.join(BASE_DIR, "bmo_faces")
+    IDLE_THOUGHT_DIR = os.path.join(BASE_DIR, "idle_thought")
+    MESSAGES_FILE = os.path.join(BASE_DIR, "messages.json")
+    
+    # Ensure dirs exist
+    for d in [NEXTCLOUD_PATH, BMO_FACES_ROOT, IDLE_THOUGHT_DIR]:
+        os.makedirs(d, exist_ok=True)
+        
+else:
+    # Raspberry Pi Paths (Original)
+    FB_DEVICE = "/dev/fb1"
+    TOUCH_DEVICE = "/dev/input/event4" 
+    NEXTCLOUD_PATH = "/home/pi/mnt/nextcloud/shr/BMO_Agnes"
+    CONFIG_FILE = "/home/pi/bmo/bmo_config.json"
+    BMO_FACES_ROOT = "/home/pi/bmo/bmo_faces"
+    IDLE_THOUGHT_DIR = "/home/pi/bmo/bmo_assets/idle/thought"
+    MESSAGES_FILE = "/home/pi/bmo/messages.json"
 
 # API Configuration
-# Base URL for the server
 SERVER_URL = "https://bmo.pg.maxencevacheron.fr" 
-MESSAGES_URL = f"{SERVER_URL}" # GET / (with ?recipient=...)
+MESSAGES_URL = f"{SERVER_URL}" # GET / (?)
 READ_RECEIPT_URL = f"{SERVER_URL}/read" # POST /read
 SEND_MESSAGE_URL = f"{SERVER_URL}/send" # POST /send
 
 # --- IDENTITY ---
-# Determine identity from Environment Variable or Config
-# Default to "BMO"
 IDENTITY = os.environ.get("BMO_IDENTITY", "BMO") 
 
 # --- COLORS ---
@@ -30,14 +54,12 @@ WHITE = (245, 247, 250)
 GRAY = (127, 140, 141)
 
 if IDENTITY == "AMO":
-    # AMO Theme (Purple/Green/Darker?)
     MAIN_COLOR = (142, 68, 173) # Purple
     ACCENT_COLOR = (46, 204, 113) # Green
     HIGHLIGHT_COLOR = (155, 89, 182) # Lighter Purple
     ALERT_COLOR = (231, 76, 60) # Red
     FACE_COLOR = (155, 89, 182) # Purple Face
 else:
-    # BMO Theme (Teal/Green/Yellow)
     MAIN_COLOR = (165, 215, 185) # Teal
     ACCENT_COLOR = (255, 148, 178) # Pink
     HIGHLIGHT_COLOR = (241, 196, 15) # Yellow
@@ -63,10 +85,17 @@ FONT_TINY = None
 def init_fonts():
     global FONT_LARGE, FONT_MEDIUM, FONT_SMALL, FONT_TINY
     try:
-        FONT_LARGE = pygame.font.Font("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 60)
-        FONT_MEDIUM = pygame.font.Font("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 35)
-        FONT_SMALL = pygame.font.Font("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
-        FONT_TINY = pygame.font.Font("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 15)
+        if IS_WINDOWS:
+             # Use generic system font or specific ttf if available
+             FONT_LARGE = pygame.font.SysFont("arial", 60, bold=True)
+             FONT_MEDIUM = pygame.font.SysFont("arial", 35, bold=True)
+             FONT_SMALL = pygame.font.SysFont("arial", 20, bold=True)
+             FONT_TINY = pygame.font.SysFont("arial", 15, bold=True)
+        else:
+            FONT_LARGE = pygame.font.Font("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 60)
+            FONT_MEDIUM = pygame.font.Font("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 35)
+            FONT_SMALL = pygame.font.Font("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
+            FONT_TINY = pygame.font.Font("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 15)
     except:
         FONT_LARGE = pygame.font.SysFont(None, 60)
         FONT_MEDIUM = pygame.font.SysFont(None, 35)

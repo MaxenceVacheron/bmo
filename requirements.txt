@@ -1,0 +1,4 @@
+pygame
+Pillow
+requests
+evdev; platform_system == "Linux"

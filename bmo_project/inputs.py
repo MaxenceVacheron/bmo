@@ -1,8 +1,14 @@
 import threading
 import time
 import pygame
-from evdev import InputDevice, ecodes
 from . import config
+# Only import evdev on Linux if possible, or handle import error
+try:
+    from evdev import InputDevice, ecodes
+    HAS_EVDEV = True
+except ImportError:
+    HAS_EVDEV = False
+
 from . import utils
 
 def touch_thread(running_event):
@@ -10,6 +16,14 @@ def touch_thread(running_event):
     Background thread to read touch events and post them to Pygame event queue.
     running_event: threading.Event to signal when to stop.
     """
+    if config.IS_WINDOWS or not HAS_EVDEV:
+        # On Windows, Pygame handles mouse events as touch events in the main loop
+        # We don't need a separate thread for input
+        print("🖱️ Running in Desktop Mode: Using Mouse for Touch Input")
+        while running_event.is_set():
+            time.sleep(1)
+        return
+
     touch_path = utils.find_touch_device()
     try:
         dev = InputDevice(touch_path)
@@ -18,9 +32,6 @@ def touch_thread(running_event):
         raw_x, raw_y = 0, 0
         last_finger_state = False
         finger_down = False
-        
-        # Non-blocking read loop ideally, or blocking with timeout
-        # standard read_loop is blocking. We can use select or just rely on daemon thread.
         
         for event in dev.read_loop():
             if not running_event.is_set():
@@ -37,12 +48,6 @@ def touch_thread(running_event):
                 if finger_down and not last_finger_state:
                     # New Touch Detected!
                     # Calibration (from bmo_pygame.py)
-                    # sx = WIDTH - ((raw_y / 4095.0) * WIDTH)
-                    # sy = (raw_x / 4095.0) * HEIGHT
-                    
-                    # Note: raw_y mapped to X, inverted? 
-                    # This depends on screen orientation. 
-                    # Assuming bmo_pygame.py calibration was correct for the hardware.
                     
                     sx = config.WIDTH - ((raw_y / 4095.0) * config.WIDTH)
                     sy = (raw_x / 4095.0) * config.HEIGHT
