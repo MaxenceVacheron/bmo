@@ -4,7 +4,7 @@ set -e
 
 # Configuration
 # Set to specific IP if needed (e.g. "172.24.13.4"), or leave empty to use "bmo" alias from ssh config
-BMO_IP="172.24.13.4"
+BMO_IP=""
 
 if [ -n "$BMO_IP" ]; then
     SSH_TARGET="pi@$BMO_IP"

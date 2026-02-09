@@ -100,10 +100,10 @@ LOVE_NOTES = [
 
 # --- T9 KEYBOARD DATA ---
 T9_MAPPING = {
-    '2': 'abc', '3': 'def',
-    '4': 'ghi', '5': 'jkl', '6': 'mno',
-    '7': 'pqrs', '8': 'tuv', '9': 'wxyz',
-    '0': ' '
+    '1': '.,!1', '2': 'abc2', '3': 'def3',
+    '4': 'ghi4', '5': 'jkl5', '6': 'mno6',
+    '7': 'pqrs7', '8': 'tuv8', '9': 'wxyz9',
+    '0': ' 0'
 }
 T9_DICT = {} # Loaded dynamically
 T9_COMMON_WORDS = ["salut", "cc", "ca va", "oui", "non", "bisous", "ok", "merci", "je", "tu", "il", "elle", "nous", "vous", "ils", "elles", "le", "la", "les", "un", "une", "des", "et", "ou", "mais", "donc", "or", "ni", "car", "a", "bof", "super", "cool", "lol", "mdr", "bmo", "agnes", "maxence", "love", "bisou", "miam", "dodo", "faim", "soif", "calin", "je t'aime", "trop bien", "bonjour", "bonsoir", "nuit", "demain", "aujourd'hui", "hier", "plus", "moins", "bien", "mal", "tout", "rien", "jamais", "toujours", "vite", "lent", "grand", "petit", "gros", "mince", "beau", "belle", "moche", "gentil", "mechant", "drole", "triste", "heureux", "malheureux", "fatigue", "enerve", "calme", "stress", "boulo", "travail", "maison", "ecole", "voiture", "velo", "bus", "train", "avion", "bateau", "motos", "rue", "route", "chemin", "ville", "campagne", "mer", "montagne", "foret", "parc", "jardin", "fleur", "arbre", "soleil", "lune", "etoile", "ciel", "nuage", "pluie", "neige", "vent", "orage", "tempete", "chaud", "froid", "tied", "sec", "mouille", "propre", "sale", "vide", "plein", "haut", "bas", "gauche", "droite", "devant", "derriere", "pres", "loin", "ici", "la", "ailleurs", "partout", "nulle part", "quelque part", "quelqu'un", "personne", "tout le monde", "rien du tout", "tout a fait", "pas du tout", "peut-etre", "surement", "certainement", "absolument", "vraiment", "totalement", "completement", "exactement", "precisement", "environ", "presque", "a peu pres", "grosso modo", "en gros", "en bref", "en resume", "en conclusion", "enfin", "finalement", "bref"]
@@ -330,7 +330,10 @@ state = {
         "candidates": [],
         "candidate_idx": 0,
         "cursor_visible": True,
-        "reply_to_id": None
+        "reply_to_id": None,
+        "last_key": None,
+        "last_key_time": 0,
+        "press_count": 0
     }
 }
 
@@ -1773,32 +1776,20 @@ def draw_focus_face(screen):
 
 # --- COMPOSE / T9 FUNCTIONS ---
 def handle_compose_touch(pos):
-    """Handle touches in COMPOSE mode"""
+    """Handle touches in COMPOSE mode with Multi-tap cycling"""
     x, y = pos
+    now = time.time()
     
     # 1. Top Bar (Close)
     if y < 50 and x > WIDTH - 60:
         state["mode"] = "MESSAGES"
         return
 
-    # 2. Candidates Bar (Select word)
-    if 90 <= y < 140:
-        candidates = state["compose"]["candidates"]
-        if candidates:
-            # Simple equal width division
-            w_per_word = WIDTH // min(3, len(candidates))
-            idx = int(x // w_per_word)
-            
-            if idx < len(candidates):
-                word = candidates[idx]
-                state["compose"]["text"] += word + " "
-                state["compose"]["buffer"] = ""
-                state["compose"]["candidates"] = []
-                state["compose"]["candidate_idx"] = 0
-                state["needs_redraw"] = True
-            return
+    # 2. Candidates Bar (Optional - for T9 if still used, otherwise ignore)
+    # The user wants multi-tap, so we'll treat this as a "Commit" or "Select" area if we had candidates.
+    # For now, let's keep it but it might be empty.
 
-    # 3. Keypad (Bottom)
+    # 3. Keypad
     kb_y = 150
     kb_h = HEIGHT - kb_y
     row_h = kb_h // 4
@@ -1816,49 +1807,43 @@ def handle_compose_touch(pos):
         ]
         
         if 0 <= r < 4 and 0 <= c < 3:
-            key_char = button_map[r][c]
+            key = button_map[r][c]
             
-            if key_char == "*":
+            if key == "*":
                 # DELETE
-                if state["compose"]["buffer"]:
-                    state["compose"]["buffer"] = state["compose"]["buffer"][:-1]
-                elif state["compose"]["text"]:
+                if state["compose"]["text"]:
                     state["compose"]["text"] = state["compose"]["text"][:-1]
-            elif key_char == "#":
-                # SEND / ENTER
-                if state["compose"]["buffer"]:
-                     # Commit buffer
-                     if state["compose"]["candidates"]:
-                         state["compose"]["text"] += state["compose"]["candidates"][0] + " "
-                     else:
-                         state["compose"]["text"] += state["compose"]["buffer"] + " "
-                     state["compose"]["buffer"] = ""
-                     state["compose"]["candidates"] = []
-                else:
-                    # Send Message
-                    msg = state["compose"]["text"].strip()
-                    if msg:
-                        threading.Thread(target=send_message, args=(msg, state["compose"]["reply_to_id"]), daemon=True).start()
-                        state["compose"]["text"] = ""
-                        state["mode"] = "MESSAGES"
-            elif key_char == "0":
-                # SPACE / NEXT CANDIDATE
-                if state["compose"]["buffer"]:
-                     if state["compose"]["candidates"]:
-                         state["compose"]["text"] += state["compose"]["candidates"][0] + " "
-                     else:
-                         state["compose"]["text"] += state["compose"]["buffer"] + " "
-                     state["compose"]["buffer"] = ""
-                     state["compose"]["candidates"] = []
-                else:
-                    state["compose"]["text"] += " "
-            elif key_char == "1":
-                state["compose"]["text"] += "."
+                state["compose"]["last_key"] = None # Reset multi-tap
+            elif key == "#":
+                # SEND
+                msg = state["compose"]["text"].strip()
+                if msg:
+                    threading.Thread(target=send_message, args=(msg, state["compose"]["reply_to_id"]), daemon=True).start()
+                    state["compose"]["text"] = ""
+                    state["compose"]["last_key"] = None
+                    state["mode"] = "MESSAGES"
             else:
-                # 2-9
-                state["compose"]["buffer"] += key_char
+                # Alphanumeric Keys (0-9)
+                chars = T9_MAPPING.get(key, "")
+                if chars:
+                    # Multi-tap Logic
+                    is_same_key = (state["compose"]["last_key"] == key)
+                    is_within_timeout = (now - state["compose"]["last_key_time"] < 0.8)
+                    
+                    if is_same_key and is_within_timeout:
+                        # Cycle
+                        state["compose"]["text"] = state["compose"]["text"][:-1]
+                        state["compose"]["press_count"] += 1
+                    else:
+                        # New char
+                        state["compose"]["press_count"] = 0
+                    
+                    char = chars[state["compose"]["press_count"] % len(chars)]
+                    state["compose"]["text"] += char
+                    
+                    state["compose"]["last_key"] = key
+                    state["compose"]["last_key_time"] = now
             
-            update_t9_candidates()
             state["needs_redraw"] = True
 
 def update_t9_candidates():
@@ -1914,7 +1899,7 @@ def draw_compose(screen):
     screen.blit(lbl, (WIDTH-25-lbl.get_width()//2, 12))
 
     # Text Area
-    display_text = state["compose"]["text"] + state["compose"]["buffer"]
+    display_text = state["compose"]["text"]
     if int(time.time() * 2) % 2 == 0: display_text += "|"
         
     y = 50
@@ -1931,55 +1916,53 @@ def draw_compose(screen):
     txt = FONT_MEDIUM.render(' '.join(line), False, BLACK)
     screen.blit(txt, (10, y))
     
-    # Candidates Bar
+    # 3. Candidates Bar (Now acting as a "current word" or "next" hint)
     bar_y = 110
     pygame.draw.rect(screen, GRAY, (0, bar_y, WIDTH, 40))
-    candidates = state["compose"]["candidates"]
-    if candidates:
-        cx = 10
-        for w in candidates[:3]:
-            cw = FONT_SMALL.size(w)[0] + 20
-            pygame.draw.rect(screen, WHITE, (cx, bar_y+5, cw, 30), border_radius=15)
-            lbl = FONT_SMALL.render(w, False, BLACK)
-            screen.blit(lbl, (cx+10, bar_y+10))
-            cx += cw + 10
-    elif state["compose"]["buffer"]:
-        lbl = FONT_SMALL.render(state["compose"]["buffer"], False, BLACK)
-        screen.blit(lbl, (10, bar_y+10))
+    # We can show a hint of the next character in cycle
+    if state["compose"]["last_key"]:
+        key = state["compose"]["last_key"]
+        chars = T9_MAPPING.get(key, "")
+        if chars:
+            hint_text = ""
+            for i, c in enumerate(chars):
+                if i == (state["compose"]["press_count"] % len(chars)):
+                    hint_text += f"[{c}] "
+                else:
+                    hint_text += f"{c} "
+            lbl = FONT_SMALL.render(hint_text.strip(), False, WHITE)
+            screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, bar_y + 10))
     
-    # Keypad
+    # 4. Keypad
     kb_y = 150
     kb_h = HEIGHT - kb_y
     col_w = WIDTH // 3
     row_h = kb_h // 4
     
+    # Define labels that show characters
     keys = [
-        ['1', '2 ABC', '3 DEF'],
-        ['4 GHI', '5 JKL', '6 MNO'],
-        ['7 PQRS', '8 TUV', '9 WXYZ'],
-        ['* DEL', '0 _', '# SEND']
+        ('1', '.,!1'),  ('2', 'ABC2'), ('3', 'DEF3'),
+        ('4', 'GHI4'),  ('5', 'JKL5'), ('6', 'MNO6'),
+        ('7', 'PQRS7'), ('8', 'TUV8'), ('9', 'WXYZ9'),
+        ('*', 'DEL'),   ('0', 'SPACE'), ('#', 'SEND')
     ]
     
-    for r, row in enumerate(keys):
-        for c, label in enumerate(row):
-            bx = c * col_w
-            by = kb_y + r * row_h
-            
-            color = WHITE
-            if label.startswith("#"): color = GREEN
-            elif label.startswith("*"): color = RED
-            
-            pygame.draw.rect(screen, color, (bx, by, col_w, row_h))
-            pygame.draw.rect(screen, GRAY, (bx, by, col_w, row_h), 1)
-            
-            main_char = label.split(' ')[0]
-            sub = label.split(' ')[1] if ' ' in label else ''
-            
-            l1 = FONT_MEDIUM.render(main_char, False, BLACK)
-            screen.blit(l1, (bx + col_w//2 - l1.get_width()//2, by + 5))
-            if sub:
-                l2 = FONT_TINY.render(sub, False, GRAY)
-                screen.blit(l2, (bx + col_w//2 - l2.get_width()//2, by + 35))
+    for i, (main_char, sub) in enumerate(keys):
+        r, c = i // 3, i % 3
+        bx, by = c * col_w, kb_y + r * row_h
+        
+        color = WHITE
+        if main_char == "#": color = GREEN
+        elif main_char == "*": color = RED
+        
+        pygame.draw.rect(screen, color, (bx, by, col_w, row_h))
+        pygame.draw.rect(screen, GRAY, (bx, by, col_w, row_h), 1)
+        
+        l1 = FONT_MEDIUM.render(main_char, False, BLACK)
+        screen.blit(l1, (bx + col_w//2 - l1.get_width()//2, by + 5))
+        
+        l2 = FONT_TINY.render(sub, False, GRAY if color == WHITE else WHITE)
+        screen.blit(l2, (bx + col_w//2 - l2.get_width()//2, by + 35))
 
 def main():
     # singleton check
