@@ -11,11 +11,8 @@ def render_text_with_emoji(text, size, color, font_path=None):
     
     # Select best available font if none provided
     if font_path is None:
-        # Use simple consistent logic: if check config.FONT_FILE
         if os.path.exists(config.FONT_FILE):
-            font_path = config.FONT_FILE
-        elif config.IS_WINDOWS:
-            font_path = "arial.ttf"
+             font_path = config.FONT_FILE
         else:
              font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
     

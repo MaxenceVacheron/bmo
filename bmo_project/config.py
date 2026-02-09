@@ -13,7 +13,7 @@ IS_WINDOWS = sys.platform.startswith('win')
 
 # Paths setup
 if IS_WINDOWS:
-    SCALE_FACTOR = 2
+    SCALE_FACTOR = 1
     BASE_DIR = os.path.join(os.getcwd(), "bmo_data")
 else:
     SCALE_FACTOR = 1
@@ -105,18 +105,20 @@ def init_fonts():
         font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
     try:
-        if font_path:
-            FONT_LARGE = pygame.font.Font(font_path, 60)
-            FONT_MEDIUM = pygame.font.Font(font_path, 35)
-            FONT_SMALL = pygame.font.Font(font_path, 20)
-            FONT_TINY = pygame.font.Font(font_path, 15)
-        else:
-            # System fallback (Arial on Windows, default on Linux)
-            name = "arial" if IS_WINDOWS else None
-            FONT_LARGE = pygame.font.SysFont(name, 60, bold=True)
-            FONT_MEDIUM = pygame.font.SysFont(name, 35, bold=True)
-            FONT_SMALL = pygame.font.SysFont(name, 20, bold=True)
-            FONT_TINY = pygame.font.SysFont(name, 15, bold=True)
+    # Try to use the explicit font file first (downloaded or system)
+    font_path = FONT_FILE if os.path.exists(FONT_FILE) else "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+
+    try:
+        FONT_LARGE = pygame.font.Font(font_path, 60)
+        FONT_MEDIUM = pygame.font.Font(font_path, 35)
+        FONT_SMALL = pygame.font.Font(font_path, 20)
+        FONT_TINY = pygame.font.Font(font_path, 15)
+    except:
+        # Emergency fallback only if the specific font fails
+        FONT_LARGE = pygame.font.SysFont(None, 60)
+        FONT_MEDIUM = pygame.font.SysFont(None, 35)
+        FONT_SMALL = pygame.font.SysFont(None, 20)
+        FONT_TINY = pygame.font.SysFont(None, 15)
     except:
         FONT_LARGE = pygame.font.SysFont(None, 60)
         FONT_MEDIUM = pygame.font.SysFont(None, 35)
