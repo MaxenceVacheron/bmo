@@ -1437,6 +1437,9 @@ def draw_messages_menu(screen):
             
             # Format timestamp
             ts = m.get("timestamp", 0)
+            # Format timestamp (Fix +1h)
+            ts = m.get("timestamp", 0)
+            if ts: ts += 3600 
             formatted_time = time.strftime("%d/%m %H:%M", time.localtime(ts)) if ts else ""
             
             lbl_s = FONT_TINY.render(f"From: {sender}", False, BLACK)
@@ -1474,39 +1477,57 @@ def draw_message_view(screen):
         state["mode"] = "MESSAGES"
         return
         
-    pygame.draw.rect(screen, BLACK, (0, 0, WIDTH, 50))
-    title = FONT_SMALL.render(f"Message from {msg.get('sender', '...')}", False, WHITE)
-    screen.blit(title, (WIDTH//2 - title.get_width()//2, 15))
+    s_col, s_row = 15, 10 
     
-    # Date display
+    # Minimalist Fullscreen Layout
+    # Date at top right
     ts = msg.get("timestamp", 0)
-    formatted_date = time.strftime("%A %d %B, %H:%M", time.localtime(ts)) if ts else ""
+    if ts: ts += 3600
+    formatted_date = time.strftime("%d/%m %H:%M", time.localtime(ts)) if ts else ""
     date_surf = FONT_TINY.render(formatted_date, False, GRAY)
-    screen.blit(date_surf, (20, 55))
+    screen.blit(date_surf, (WIDTH - 20 - date_surf.get_width(), 10))
     
-    # Word wrap content
+    # Word wrap content centered vertically
     content = msg.get("content", "")
     words = content.split(' ')
     lines = []
     line = []
+    max_w = WIDTH - 60
+    
+    # Check if content fits in LARGE font
+    current_font = FONT_MEDIUM
+    # Simple heuristic: if len > 100 chars, use SMALL
+    if len(content) > 100: current_font = FONT_SMALL
+    
     for w in words:
         line.append(w)
-        if FONT_SMALL.size(' '.join(line))[0] > 440:
+        if current_font.size(' '.join(line))[0] > max_w:
             line.pop()
             lines.append(' '.join(line))
             line = [w]
     lines.append(' '.join(line))
     
-    y = 85
-    for l in lines:
-        surf = FONT_SMALL.render(l, False, BLACK)
-        screen.blit(surf, (20, y))
-        y += 25
+    # Calculate vertical center
+    line_h = current_font.get_height() + 5
+    total_h = len(lines) * line_h
+    start_y = (HEIGHT - total_h) // 2
+    
+    for i, l in enumerate(lines):
+        surf = current_font.render(l, False, BLACK)
+        # Center horizontally
+        x = (WIDTH - surf.get_width()) // 2
+        screen.blit(surf, (x, start_y + i * line_h))
+    
+    # Sender as signature bottom right
+    sender = msg.get("sender", "Unknown")
+    sig = FONT_TINY.render(f"- {sender}", False, GRAY)
+    screen.blit(sig, (WIDTH - 30 - sig.get_width(), HEIGHT - 30))
+    
+    # Subtle Back interaction hint (no big buttons)
+    hint = FONT_TINY.render("< TAP TO CLOSE", False, (200, 200, 200))
+    screen.blit(hint, (20, HEIGHT - 30))
         
-    # Back Button
-    pygame.draw.rect(screen, GRAY, (WIDTH//2 - 50, 270, 100, 40), border_radius=10)
-    lbl = FONT_SMALL.render("BACK", False, WHITE)
-    screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, 280))
+
 
 def draw_heart(screen):
     screen.fill(PINK)
