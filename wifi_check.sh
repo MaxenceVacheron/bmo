@@ -7,21 +7,36 @@ LOG_FILE="/var/log/wifi_check.log"
 
 # Check connection
 if ! ping -c 1 -W 5 $PING_TARGET > /dev/null; then
-    echo "$(date): Network is unreachable. Attempting to reconnect $INTERFACE..." >> $LOG_FILE
+    echo "$(date): Network is unreachable. Attempting recovery..." >> $LOG_FILE
     
-    # Method 1: Reconfigure wpa_supplicant
+    # Level 1: Quick reconfigure
     wpa_cli -i $INTERFACE reconfigure
+    sleep 5
     
-    # Wait and check again
-    sleep 10
     if ! ping -c 1 -W 5 $PING_TARGET > /dev/null; then
-        echo "$(date): Still unreachable. Hard resetting interface..." >> $LOG_FILE
+        echo "$(date): Level 1 failed. Level 2: Nuke & Restart Service..." >> $LOG_FILE
+        killall wpa_supplicant 2>/dev/null || true
+        rm -f /var/run/wpa_supplicant/$INTERFACE
         ip link set $INTERFACE down
-        sleep 5
+        sleep 2
         ip link set $INTERFACE up
+        sleep 2
+        systemctl restart wpa_supplicant
         sleep 10
-        # Ensure dhcpcd picks it up if needed, or just wait for wpa_supplicant
     fi
     
-    echo "$(date): Reconnection attempt finished." >> $LOG_FILE
+    if ! ping -c 1 -W 5 $PING_TARGET > /dev/null; then
+        echo "$(date): Level 2 failed. Level 3: Manual wpa_supplicant fallback..." >> $LOG_FILE
+        killall wpa_supplicant 2>/dev/null || true
+        rm -f /var/run/wpa_supplicant/$INTERFACE
+        wpa_supplicant -B -i $INTERFACE -c /etc/wpa_supplicant/wpa_supplicant.conf
+        sleep 10
+    fi
+    
+    # Final check
+    if ping -c 1 -W 5 $PING_TARGET > /dev/null; then
+        echo "$(date): SUCCESS - Connection restored!" >> $LOG_FILE
+    else
+        echo "$(date): CRITICAL - All recovery levels failed." >> $LOG_FILE
+    fi
 fi

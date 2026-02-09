@@ -51,7 +51,12 @@ if [ -f "/home/pi/bmo/wpa_supplicant.conf" ]; then
     echo "📶 Updating WiFi configuration..."
     sudo cp /home/pi/bmo/wpa_supplicant.conf /etc/wpa_supplicant/wpa_supplicant.conf
     sudo chmod 600 /etc/wpa_supplicant/wpa_supplicant.conf
-    sudo wpa_cli -i wlan0 reconfigure
+    
+    # Pre-emptive cleanup to avoid "FAIL"
+    sudo killall wpa_supplicant 2>/dev/null || true
+    sudo rm -f /var/run/wpa_supplicant/wlan0
+    
+    sudo wpa_cli -i wlan0 reconfigure || (echo "⚠️ wpa_cli failed, trying manual restart..." && sudo systemctl restart wpa_supplicant)
     echo "✅ WiFi configuration updated!"
 fi
 
