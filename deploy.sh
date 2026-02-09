@@ -14,11 +14,12 @@ else
     GIT_REMOTE_URL="pi@bmo:/home/pi/bmo"
 fi
 
-echo "🚀 Starting Deployment to $SSH_TARGET..."
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+echo "🚀 Starting Deployment of branch [$CURRENT_BRANCH] to $SSH_TARGET..."
 
 # 1. Push to GitHub (Source of Truth)
-echo "☁️ Pushing to GitHub (origin main)..."
-git push origin main
+echo "☁️ Pushing to GitHub (origin $CURRENT_BRANCH)..."
+git push origin $CURRENT_BRANCH
 
 # 2. Prepare Raspberry Pi (Force Clean)
 echo "🧹 Configuring Raspberry Pi environment..."
@@ -32,7 +33,7 @@ if ! git remote | grep -q "^bmo-device$"; then
 else
     git remote set-url bmo-device "$GIT_REMOTE_URL"
 fi
-git push bmo-device main:main -f
+git push bmo-device $CURRENT_BRANCH:main -f
 
 # 4. Restart Service
 echo "🔄 Restarting BMO Service..."
@@ -40,6 +41,7 @@ ssh $SSH_TARGET << 'EOF'
 sudo systemctl stop bmo.service 2>/dev/null || true
 cd /home/pi/bmo
 # Ensure we are on main and up to date (redundant but safe)
+# We push our local branch to remote main for simplicity on the device
 git checkout -f main
 git reset --hard HEAD
 sudo systemctl daemon-reload
