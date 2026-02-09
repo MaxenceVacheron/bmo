@@ -872,6 +872,7 @@ def update_gif():
         frames = state["gif_player"]["frames"]
         if frames:
             state["gif_player"]["frame_index"] = (state["gif_player"]["frame_index"] + 1) % len(frames)
+            state["needs_redraw"] = True
 
 def draw_gif(screen):
     screen.fill(BLACK)
@@ -2038,9 +2039,7 @@ def main():
                 draw_startup(screen)
             elif state["mode"] == "SLIDESHOW":
                 draw_slideshow(screen)
-            elif state["mode"] == "GIF_PLAYER":
-                draw_gif(screen)
-            elif state["mode"] == "RANDOM_GIF":
+            elif state["mode"] == "GIF_PLAYER" or state["mode"] == "RANDOM_GIF":
                 draw_gif(screen)
             elif state["mode"] == "TEXT_VIEWER":
                 draw_text_viewer(screen)
