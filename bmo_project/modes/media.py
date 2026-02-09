@@ -231,8 +231,40 @@ def draw_gif(screen, state):
     screen.blit(frame, (x, y))
 
     # Hints
-    if time.time() - state["gif_player"].get("last_touch_time", 0) < 1.0:
-        hint_left = config.FONT_SMALL.render("<", True, config.WHITE)
-        hint_right = config.FONT_SMALL.render(">", True, config.WHITE)
         screen.blit(hint_left, (10, config.HEIGHT - 30))
         screen.blit(hint_right, (config.WIDTH - 30, config.HEIGHT - 30))
+
+def trigger_random_gif(state):
+    # Search in both default and perso
+    candidates = []
+    for subdir in ["default", "perso"]:
+        path = os.path.join(config.NEXTCLOUD_PATH, subdir, "Photos", "GIFs")
+        if os.path.exists(path):
+            try:
+                for f in os.listdir(path):
+                    if f.lower().endswith('.gif'):
+                        candidates.append(os.path.join(path, f))
+            except: pass
+            
+    if not candidates: return
+
+    # Pick one
+    gif_path = random.choice(candidates)
+    
+    # Init GIF Player State specifically for random play
+    if "gif_player" not in state: state["gif_player"] = {}
+    
+    # We manually set the GIF check this
+    frames, duration = _load_gif_frames(gif_path)
+    if not frames: return
+    
+    state["gif_player"]["frames"] = frames
+    state["gif_player"]["frame_duration"] = duration
+    state["gif_player"]["frame_index"] = 0
+    state["gif_player"]["last_frame_time"] = time.time()
+    
+    state["random_gif"]["active"] = True
+    state["random_gif"]["start_time"] = time.time()
+    state["random_gif"]["duration"] = 5.0 # Play for 5 seconds
+    
+    state["current_mode"] = "RANDOM_GIF"

@@ -86,6 +86,15 @@ def main():
              "last_update": 0
         },
         
+        "random_gif": {
+            "last_trigger": time.time(),
+            "active": False
+        },
+        
+        "is_showing_pop_face": False,
+        "pop_face_timer": time.time() + 60,
+        "pop_face_end_time": 0,
+        
         "tap_times": []
     }
     
@@ -139,7 +148,14 @@ def main():
                         
                         # Exit to let systemd restart
                         sys.exit(0)
-                    
+
+                    # Pop-up Face Dismissal
+                    if state.get("is_showing_pop_face"):
+                        state["is_showing_pop_face"] = False
+                        state["pop_face_timer"] = time.time() + 60 + (time.time() % 30) # Random delay
+                        state["needs_redraw"] = True
+                        continue
+
                     # Handle Mode Specific Input
                     mode = state["current_mode"]
                     
@@ -238,12 +254,29 @@ def main():
                          state["current_mode"] = "MENU"
             
             # Update Logic (Face Animation & Behaviors)
+            # Update Logic (Face Animation & Behaviors)
             if state["current_mode"] == "FACE":
                 core_modes.update_face(state)
+                # Random GIF Trigger
+                if time.time() - state["random_gif"].get("last_trigger", 0) > 60:
+                     # 10% chance? Or just trigger? Original logic was just time check + trigger
+                     # But let's add some randomness so it's not exactly every 60s
+                     if int(time.time()) % 10 == 0: 
+                         media.trigger_random_gif(state)
+                         state["random_gif"]["last_trigger"] = time.time()
+                         
             elif state["current_mode"] == "SLIDESHOW":
                 media.update_slideshow(state)
             elif state["current_mode"] == "GIF_PLAYER":
                 media.update_gif(state)
+            elif state["current_mode"] == "RANDOM_GIF":
+                media.update_gif(state)
+                # Check Duration
+                if time.time() - state["random_gif"]["start_time"] > state["random_gif"]["duration"]:
+                    state["current_mode"] = "FACE"
+                    state["random_gif"]["active"] = False
+                    state["needs_redraw"] = True
+                    
             elif state["current_mode"] == "SNAKE":
                  if state.get("snake"):
                      state["snake"].update()
@@ -254,6 +287,23 @@ def main():
                          state["needs_redraw"] = True
                      elif int(time.time()) % 1 == 0:
                          state["needs_redraw"] = True
+
+            # Pop-up Face Logic
+            # Only if not in attention-demanding modes
+            if not state.get("is_showing_pop_face") and state["current_mode"] not in ["FACE", "SNAKE", "STARTUP", "GIF_PLAYER", "SLIDESHOW", "RANDOM_GIF", "FOCUS", "MESSAGE_VIEW"]:
+                if time.time() > state.get("pop_face_timer", 0):
+                    state["is_showing_pop_face"] = True
+                    state["pop_face_end_time"] = time.time() + 5.0
+                    state["needs_redraw"] = True
+                    core_modes.load_random_face(state)
+            
+            # Update Pop-up Face
+            if state.get("is_showing_pop_face"):
+                core_modes.update_face(state) # Animate the pop-up face
+                if time.time() > state.get("pop_face_end_time", 0):
+                    state["is_showing_pop_face"] = False
+                    state["pop_face_timer"] = time.time() + 60 + (time.time() % 30)
+                    state["needs_redraw"] = True
             
             # Redraw if needed
             current_time = time.time()
@@ -276,7 +326,9 @@ def main():
                 # Draw Mode
                 mode = state["current_mode"]
                 
-                if state["current_mode"] == "FACE":
+                if state.get("is_showing_pop_face"):
+                    core_modes.draw_face(screen, state)
+                elif state["current_mode"] == "FACE":
                     core_modes.draw_face(screen, state)
                 elif state["current_mode"] == "MENU":
                     core_modes.draw_menu(screen, state)
@@ -286,6 +338,8 @@ def main():
                     messages.draw_messages(screen, state)
                 elif state["current_mode"] == "MESSAGE_VIEW":
                     messages.draw_message_view(screen, state)
+                elif state["current_mode"] == "RANDOM_GIF":
+                    media.draw_gif(screen, state)
                 
                 # --- NEW APPS ---
                 elif state["current_mode"] == "ADVANCED_STATS":

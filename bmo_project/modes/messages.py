@@ -374,10 +374,9 @@ def handle_message_view_touch(state, pos):
         state["current_mode"] = "MESSAGES"
         return
         
-    # REPLY
     if x > config.WIDTH - 110 and y > config.HEIGHT - 60:
         state["composing"] = True
-        state["keyboard"] = messages.T9Keyboard() # Fix: use messages. or just T9Keyboard if in same file
+        state["keyboard"] = T9Keyboard()
         msg = state["message_view"]["msg"]
         state["keyboard"].recipient = msg.get("sender", "AMO")
         state["current_mode"] = "MESSAGES" 
