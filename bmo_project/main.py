@@ -214,6 +214,10 @@ def main():
                         messages.handle_touch(state, pos)
                         state["needs_redraw"] = True
                         
+                    elif mode == "MESSAGE_VIEW":
+                        messages.handle_message_view_touch(state, pos)
+                        state["needs_redraw"] = True
+                        
                     elif mode == "SNAKE":
                         if state.get("snake"):
                             res = state["snake"].handle_input(pos)
