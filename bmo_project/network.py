@@ -1,3 +1,4 @@
+import os
 import base64
 import json
 import urllib.request
@@ -5,6 +6,7 @@ import urllib.parse
 import time
 import sys
 import threading
+import urllib.error
 from . import config
 
 def get_auth_headers():
@@ -59,8 +61,14 @@ def sync_messages(state):
                     print(f"📩 Received {len(new_msgs)} messages!")
                     sys.stdout.flush()
                 return True
+    except urllib.error.HTTPError as e:
+        print(f"❌ HTTP Error during Sync: {e.code} - {e.reason}")
+        try:
+             print(f"  Response: {e.read().decode()}")
+        except: pass
+        sys.stdout.flush()
     except Exception as e:
-        print(f"Sync Error: {e}")
+        print(f"❌ Sync Error: {e}")
         sys.stdout.flush()
     return False
 
@@ -121,8 +129,13 @@ def send_message(recipient, content):
                 print(f"⚠️ Failed to send message: {response.status}")
                 return False
                 
+    except urllib.error.HTTPError as e:
+        print(f"❌ HTTP Error during Send: {e.code} - {e.reason}")
+        try:
+             print(f"  Response: {e.read().decode()}")
+        except: pass
     except Exception as e:
-        print(f"Send Error: {e}")
+        print(f"❌ Send Error: {e}")
         return False
 
 def fetch_remote_messages(state):

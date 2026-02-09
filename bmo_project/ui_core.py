@@ -1,3 +1,4 @@
+import os
 import pygame
 from PIL import Image, ImageDraw, ImageFont
 from . import config
@@ -7,17 +8,27 @@ def render_text_with_emoji(text, size, color, font_path=None):
     Render text including emojis using PIL and convert to Pygame Surface.
     Returns a Pygame Surface.
     """
-    # Use config font path if not provided
-    # Note: Default PIL font might not support emojis well without a color emoji font.
-    # We will try to use the best available font.
     
+    # Select best available font if none provided
     if font_path is None:
-        font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        # Use simple consistent logic: if check config.FONT_FILE
+        if os.path.exists(config.FONT_FILE):
+            font_path = config.FONT_FILE
+        elif config.IS_WINDOWS:
+            font_path = "arial.ttf"
+        else:
+             font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
     
     try:
         pil_font = ImageFont.truetype(font_path, size)
-    except:
-        pil_font = ImageFont.load_default()
+    except IOError:
+        try:
+            # Fallback for Windows if arial.ttf lookup fails
+            pil_font = ImageFont.truetype("C:\\Windows\\Fonts\\arial.ttf", size)
+        except:
+            # Last resort
+            print("⚠️ Warning: Could not load requested font, using default PIL font (ugly).")
+            pil_font = ImageFont.load_default()
 
     # Calculate text size (dummy)
     dummy_img = Image.new('RGBA', (1, 1), (0, 0, 0, 0))
@@ -37,8 +48,6 @@ def render_text_with_emoji(text, size, color, font_path=None):
     draw = ImageDraw.Draw(img)
     
     # Draw text
-    # Note: 'embedded_color=True' requires libraqm and a color font (like NotoColorEmoji)
-    # If not present, it will render monochrome outlines if the font supports the glyphs.
     draw.text((5, 5), text, font=pil_font, fill=color, embedded_color=True)
     
     # Convert to Pygame Surface

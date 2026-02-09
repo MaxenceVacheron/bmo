@@ -137,4 +137,8 @@ def main():
         display.cleanup()
 
 if __name__ == "__main__":
+    if sys.platform.startswith('win'):
+        try:
+            sys.stdout.reconfigure(encoding='utf-8')
+        except: pass
     main()

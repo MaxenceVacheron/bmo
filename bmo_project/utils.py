@@ -3,7 +3,11 @@ import shutil
 import socket
 import subprocess
 import sys
-from evdev import list_devices, InputDevice
+try:
+    from evdev import list_devices, InputDevice
+    HAS_EVDEV = True
+except ImportError:
+    HAS_EVDEV = False
 
 def get_cpu_temp():
     try:
@@ -64,6 +68,9 @@ def get_wifi_strength():
 
 def find_touch_device():
     """Dynamically find the touchscreen device"""
+    if not HAS_EVDEV:
+        return "/dev/null" # Dummy path for non-Linux systems
+
     print("🔍 Searching for touchscreen devices...")
     try:
         devices = [InputDevice(path) for path in list_devices()]

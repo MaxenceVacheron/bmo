@@ -6,10 +6,17 @@ def init_display():
     """Initialize Pygame and the display surface"""
     
     if config.IS_WINDOWS:
-        # Windowed mode for local dev
+        # Windowed mode for local dev with scaling
         pygame.init()
-        screen = pygame.display.set_mode((config.WIDTH, config.HEIGHT))
-        pygame.display.set_caption(f"{config.IDENTITY} - BMO Project")
+        # Create a window that is scaled up
+        window_width = config.WIDTH * config.SCALE_FACTOR
+        window_height = config.HEIGHT * config.SCALE_FACTOR
+        window = pygame.display.set_mode((window_width, window_height))
+        pygame.display.set_caption(f"{config.IDENTITY} - BMO Project (Scaled {config.SCALE_FACTOR}x)")
+        
+        # We still return a "virtual" screen at the original resolution (480x320)
+        # We will scale this surface to the window in update_framebuffer
+        screen = pygame.Surface((config.WIDTH, config.HEIGHT))
         
     else:
         # Headless/Framebuffer mode for Raspberry Pi
@@ -25,10 +32,12 @@ def init_display():
     return screen
 
 def update_framebuffer(screen, fb_path=config.FB_DEVICE):
-    """Write the current screen content to the framebuffer device"""
+    """Write the current screen content to the framebuffer device or window"""
     try:
         if config.IS_WINDOWS:
-            # On windows, just flip the display
+            # Scale the internal screen to the window size
+            window = pygame.display.get_surface()
+            pygame.transform.scale(screen, window.get_size(), window)
             pygame.display.flip()
         elif fb_path:
             with open(fb_path, "wb") as fb:
