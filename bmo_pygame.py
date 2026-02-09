@@ -98,6 +98,35 @@ LOVE_NOTES = [
     "You look great today!",
 ]
 
+# --- T9 KEYBOARD DATA ---
+T9_MAPPING = {
+    '2': 'abc', '3': 'def',
+    '4': 'ghi', '5': 'jkl', '6': 'mno',
+    '7': 'pqrs', '8': 'tuv', '9': 'wxyz',
+    '0': ' '
+}
+T9_DICT = {} # Loaded dynamically
+T9_COMMON_WORDS = ["salut", "cc", "ca va", "oui", "non", "bisous", "ok", "merci", "je", "tu", "il", "elle", "nous", "vous", "ils", "elles", "le", "la", "les", "un", "une", "des", "et", "ou", "mais", "donc", "or", "ni", "car", "a", "bof", "super", "cool", "lol", "mdr", "bmo", "agnes", "maxence", "love", "bisou", "miam", "dodo", "faim", "soif", "calin", "je t'aime", "trop bien", "bonjour", "bonsoir", "nuit", "demain", "aujourd'hui", "hier", "plus", "moins", "bien", "mal", "tout", "rien", "jamais", "toujours", "vite", "lent", "grand", "petit", "gros", "mince", "beau", "belle", "moche", "gentil", "mechant", "drole", "triste", "heureux", "malheureux", "fatigue", "enerve", "calme", "stress", "boulo", "travail", "maison", "ecole", "voiture", "velo", "bus", "train", "avion", "bateau", "motos", "rue", "route", "chemin", "ville", "campagne", "mer", "montagne", "foret", "parc", "jardin", "fleur", "arbre", "soleil", "lune", "etoile", "ciel", "nuage", "pluie", "neige", "vent", "orage", "tempete", "chaud", "froid", "tied", "sec", "mouille", "propre", "sale", "vide", "plein", "haut", "bas", "gauche", "droite", "devant", "derriere", "pres", "loin", "ici", "la", "ailleurs", "partout", "nulle part", "quelque part", "quelqu'un", "personne", "tout le monde", "rien du tout", "tout a fait", "pas du tout", "peut-etre", "surement", "certainement", "absolument", "vraiment", "totalement", "completement", "exactement", "precisement", "environ", "presque", "a peu pres", "grosso modo", "en gros", "en bref", "en resume", "en conclusion", "enfin", "finalement", "bref"]
+
+def load_t9_dictionary():
+    """Load dictionary words for T9 prediction"""
+    global T9_DICT
+    # Start with common words
+    for w in T9_COMMON_WORDS:
+        seq = ""
+        for char in w.lower():
+            for k, v in T9_MAPPING.items():
+                if char in v:
+                    seq += k
+                    break
+        if seq:
+            if seq not in T9_DICT: T9_DICT[seq] = []
+            if w not in T9_DICT[seq]: T9_DICT[seq].append(w)
+            
+    # Try system dictionary if available (simple import)
+    # Reducing scope for single file simplicity/performance
+    pass
+
 # --- MENUS DEFINITION ---
 MENUS = {
     "MAIN": [
@@ -294,6 +323,14 @@ state = {
         "selected_index": 0,
         "viewing_id": None,
         "view_start_time": 0
+    },
+    "compose": {
+        "text": "",
+        "buffer": "",
+        "candidates": [],
+        "candidate_idx": 0,
+        "cursor_visible": True,
+        "reply_to_id": None
     }
 }
 
@@ -1642,6 +1679,11 @@ def draw_message_view(screen):
     hint = FONT_TINY.render("< TAP TO CLOSE", False, (200, 200, 200))
     screen.blit(hint, (20, HEIGHT - 30))
         
+    # REPLY Button
+    pygame.draw.rect(screen, TEAL, (WIDTH - 100, HEIGHT - 40, 80, 30), border_radius=5)
+    lbl = FONT_TINY.render("REPLY", False, WHITE)
+    screen.blit(lbl, (WIDTH - 60 - lbl.get_width()//2, HEIGHT - 33))
+        
 
 
 def draw_heart(screen):
@@ -1728,6 +1770,217 @@ def draw_focus_face(screen):
     pygame.draw.rect(screen, BLACK, (40, 300, 400, 10), 1)
     pygame.draw.rect(screen, GREEN, (41, 301, int(398 * progress), 8))
 
+
+# --- COMPOSE / T9 FUNCTIONS ---
+def handle_compose_touch(pos):
+    """Handle touches in COMPOSE mode"""
+    x, y = pos
+    
+    # 1. Top Bar (Close)
+    if y < 50 and x > WIDTH - 60:
+        state["mode"] = "MESSAGES"
+        return
+
+    # 2. Candidates Bar (Select word)
+    if 90 <= y < 140:
+        candidates = state["compose"]["candidates"]
+        if candidates:
+            # Simple equal width division
+            w_per_word = WIDTH // min(3, len(candidates))
+            idx = int(x // w_per_word)
+            
+            if idx < len(candidates):
+                word = candidates[idx]
+                state["compose"]["text"] += word + " "
+                state["compose"]["buffer"] = ""
+                state["compose"]["candidates"] = []
+                state["compose"]["candidate_idx"] = 0
+                state["needs_redraw"] = True
+            return
+
+    # 3. Keypad (Bottom)
+    kb_y = 150
+    kb_h = HEIGHT - kb_y
+    row_h = kb_h // 4
+    col_w = WIDTH // 3
+    
+    if y >= kb_y:
+        c = int(x // col_w)
+        r = int((y - kb_y) // row_h)
+        
+        button_map = [
+            ['1', '2', '3'],
+            ['4', '5', '6'],
+            ['7', '8', '9'],
+            ['*', '0', '#']
+        ]
+        
+        if 0 <= r < 4 and 0 <= c < 3:
+            key_char = button_map[r][c]
+            
+            if key_char == "*":
+                # DELETE
+                if state["compose"]["buffer"]:
+                    state["compose"]["buffer"] = state["compose"]["buffer"][:-1]
+                elif state["compose"]["text"]:
+                    state["compose"]["text"] = state["compose"]["text"][:-1]
+            elif key_char == "#":
+                # SEND / ENTER
+                if state["compose"]["buffer"]:
+                     # Commit buffer
+                     if state["compose"]["candidates"]:
+                         state["compose"]["text"] += state["compose"]["candidates"][0] + " "
+                     else:
+                         state["compose"]["text"] += state["compose"]["buffer"] + " "
+                     state["compose"]["buffer"] = ""
+                     state["compose"]["candidates"] = []
+                else:
+                    # Send Message
+                    msg = state["compose"]["text"].strip()
+                    if msg:
+                        threading.Thread(target=send_message, args=(msg, state["compose"]["reply_to_id"]), daemon=True).start()
+                        state["compose"]["text"] = ""
+                        state["mode"] = "MESSAGES"
+            elif key_char == "0":
+                # SPACE / NEXT CANDIDATE
+                if state["compose"]["buffer"]:
+                     if state["compose"]["candidates"]:
+                         state["compose"]["text"] += state["compose"]["candidates"][0] + " "
+                     else:
+                         state["compose"]["text"] += state["compose"]["buffer"] + " "
+                     state["compose"]["buffer"] = ""
+                     state["compose"]["candidates"] = []
+                else:
+                    state["compose"]["text"] += " "
+            elif key_char == "1":
+                state["compose"]["text"] += "."
+            else:
+                # 2-9
+                state["compose"]["buffer"] += key_char
+            
+            update_t9_candidates()
+            state["needs_redraw"] = True
+
+def update_t9_candidates():
+    """Update T9 candidates based on buffer"""
+    buf = state["compose"]["buffer"]
+    state["compose"]["candidates"] = []
+    
+    if not buf: return
+    
+    # Check dictionary
+    if buf in T9_DICT:
+        state["compose"]["candidates"] = T9_DICT[buf][:5]
+
+def send_message(text, reply_to_id=None):
+    """Send message to API"""
+    try:
+        print(f"📤 Sending: {text}")
+        sys.stdout.flush()
+        
+        data = json.dumps({
+            "content": text,
+            "sender": "BMO",
+            "reply_to": reply_to_id,
+            "timestamp": int(time.time())
+        }).encode('utf-8')
+        
+        req = urllib.request.Request(MESSAGES_URL, data=data, method='POST')
+        req.add_header('Content-Type', 'application/json')
+        auth = base64.b64encode(b"BMO:BMO").decode("ascii")
+        req.add_header('Authorization', f"Basic {auth}")
+        
+        with urllib.request.urlopen(req, timeout=10) as response:
+            if response.status in [200, 201]:
+                print("✅ Message sent!")
+            else:
+                print(f"⚠️ Failed to send: {response.status}")
+        sys.stdout.flush()
+    except Exception as e:
+        print(f"Send Error: {e}")
+        sys.stdout.flush()
+
+def draw_compose(screen):
+    screen.fill(WHITE)
+    
+    # Header
+    pygame.draw.rect(screen, TEAL, (0,0, WIDTH, 40))
+    title = FONT_SMALL.render("COMPOSING...", False, BLACK)
+    screen.blit(title, (WIDTH//2 - title.get_width()//2, 10))
+    
+    # Close Button
+    pygame.draw.rect(screen, RED, (WIDTH-40, 5, 30, 30), border_radius=5)
+    lbl = FONT_TINY.render("X", False, WHITE)
+    screen.blit(lbl, (WIDTH-25-lbl.get_width()//2, 12))
+
+    # Text Area
+    display_text = state["compose"]["text"] + state["compose"]["buffer"]
+    if int(time.time() * 2) % 2 == 0: display_text += "|"
+        
+    y = 50
+    words = display_text.split(' ')
+    line = []
+    for w in words:
+        line.append(w)
+        if FONT_MEDIUM.size(' '.join(line))[0] > WIDTH - 20:
+            line.pop()
+            txt = FONT_MEDIUM.render(' '.join(line), False, BLACK)
+            screen.blit(txt, (10, y))
+            y += 35
+            line = [w]
+    txt = FONT_MEDIUM.render(' '.join(line), False, BLACK)
+    screen.blit(txt, (10, y))
+    
+    # Candidates Bar
+    bar_y = 110
+    pygame.draw.rect(screen, GRAY, (0, bar_y, WIDTH, 40))
+    candidates = state["compose"]["candidates"]
+    if candidates:
+        cx = 10
+        for w in candidates[:3]:
+            cw = FONT_SMALL.size(w)[0] + 20
+            pygame.draw.rect(screen, WHITE, (cx, bar_y+5, cw, 30), border_radius=15)
+            lbl = FONT_SMALL.render(w, False, BLACK)
+            screen.blit(lbl, (cx+10, bar_y+10))
+            cx += cw + 10
+    elif state["compose"]["buffer"]:
+        lbl = FONT_SMALL.render(state["compose"]["buffer"], False, BLACK)
+        screen.blit(lbl, (10, bar_y+10))
+    
+    # Keypad
+    kb_y = 150
+    kb_h = HEIGHT - kb_y
+    col_w = WIDTH // 3
+    row_h = kb_h // 4
+    
+    keys = [
+        ['1', '2 ABC', '3 DEF'],
+        ['4 GHI', '5 JKL', '6 MNO'],
+        ['7 PQRS', '8 TUV', '9 WXYZ'],
+        ['* DEL', '0 _', '# SEND']
+    ]
+    
+    for r, row in enumerate(keys):
+        for c, label in enumerate(row):
+            bx = c * col_w
+            by = kb_y + r * row_h
+            
+            color = WHITE
+            if label.startswith("#"): color = GREEN
+            elif label.startswith("*"): color = RED
+            
+            pygame.draw.rect(screen, color, (bx, by, col_w, row_h))
+            pygame.draw.rect(screen, GRAY, (bx, by, col_w, row_h), 1)
+            
+            main_char = label.split(' ')[0]
+            sub = label.split(' ')[1] if ' ' in label else ''
+            
+            l1 = FONT_MEDIUM.render(main_char, False, BLACK)
+            screen.blit(l1, (bx + col_w//2 - l1.get_width()//2, by + 5))
+            if sub:
+                l2 = FONT_TINY.render(sub, False, GRAY)
+                screen.blit(l2, (bx + col_w//2 - l2.get_width()//2, by + 35))
+
 def main():
     # singleton check
     try:
@@ -1757,6 +2010,9 @@ def main():
 
     # Load initial face
     load_random_face()
+    
+    # Load T9 Dictionary
+    load_t9_dictionary()
 
     t = threading.Thread(target=touch_thread, daemon=True)
     t.start()
@@ -2029,8 +2285,19 @@ def main():
                             threading.Thread(target=send_read_receipt, args=(msg_id,), daemon=True).start()
                 
                 elif state["mode"] == "MESSAGE_VIEW":
-                    # All clicks return to inbox (simple nav)
-                    state["mode"] = "MESSAGES"
+                    # Check Reply Button
+                    if x > WIDTH - 100 and y > HEIGHT - 40:
+                        state["mode"] = "COMPOSE"
+                        state["compose"]["text"] = ""
+                        state["compose"]["buffer"] = ""
+                        state["compose"]["reply_to_id"] = state["messages"]["viewing_id"]
+                        state["needs_redraw"] = True
+                    else:
+                        # All other clicks return to inbox (Back)
+                        state["mode"] = "MESSAGES"
+                
+                elif state["mode"] == "COMPOSE":
+                    handle_compose_touch((x, y))
                 
                 elif state["mode"] == "SNAKE":
                     if state["snake"]:
@@ -2044,7 +2311,7 @@ def main():
         
         # --- UPDATE PHASE ---
         now = time.time()
-        always_update = state["mode"] in ["SNAKE", "GIF_PLAYER", "STARTUP", "SLIDESHOW", "CLOCK", "ADVANCED_STATS", "FOCUS", "HEART", "MESSAGE_VIEW", "RANDOM_GIF"]
+        always_update = state["mode"] in ["SNAKE", "GIF_PLAYER", "STARTUP", "SLIDESHOW", "CLOCK", "ADVANCED_STATS", "FOCUS", "HEART", "MESSAGE_VIEW", "RANDOM_GIF", "COMPOSE"]
         
         # Inactivity Check
         if state["mode"] in ["MENU", "STATS", "CLOCK", "NOTES", "HEART", "SETTINGS", "GAMES"]:
@@ -2106,6 +2373,7 @@ def main():
             elif state["mode"] == "HEART": draw_heart(screen)
             elif state["mode"] == "MESSAGES": draw_messages_menu(screen)
             elif state["mode"] == "MESSAGE_VIEW": draw_message_view(screen)
+            elif state["mode"] == "COMPOSE": draw_compose(screen)
             elif state["mode"] == "SNAKE":
                 state["snake"].draw(screen)
 
