@@ -43,6 +43,10 @@ cd /home/pi/bmo
 git checkout -f main
 git reset --hard HEAD
 sudo systemctl daemon-reload
+# Sync service files
+sudo cp /home/pi/bmo/bmo.service /etc/systemd/system/bmo.service
+sudo cp /home/pi/bmo/bmo-mirror.service /etc/systemd/system/bmo-mirror.service
+sudo systemctl daemon-reload
 sudo systemctl restart bmo.service
 echo "✅ Service restarted!"
 
