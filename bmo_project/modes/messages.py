@@ -237,7 +237,7 @@ def handle_touch(state, pos):
 
     # EXIT (Bottom Center)
     if config.WIDTH//2 - 40 <= x <= config.WIDTH//2 + 40 and y > 280:
-        state["mode"] = "MENU" # Go back to menu
+        state["current_mode"] = "MENU" # Go back to menu
         return
 
     # PREV/NEXT
