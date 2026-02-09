@@ -1557,12 +1557,13 @@ def draw_message_view(screen):
     
     # Calculate visible chars based on time
     start_t = state["messages"].get("view_start_time", 0)
-    elapsed = time.time() - start_t
+    now = time.time()
+    elapsed = now - start_t
     chars_to_show = int(elapsed * 30) # 30 chars per second
     
-    # DEBUG TYPEWRITER
-    if random.random() < 0.05: # Limit spam
-        print(f"DEBUG: elapsed={elapsed:.2f}, chars={chars_to_show}, len={len(content)}")
+    # DEBUG TYPEWRITER (Aggressive)
+    print(f"DEBUG: start_t={start_t}, now={now}, elapsed={elapsed:.2f}, chars={chars_to_show}, len={len(content)}")
+    sys.stdout.flush()
     
     visible_content = content[:chars_to_show]
     if chars_to_show < len(content):
