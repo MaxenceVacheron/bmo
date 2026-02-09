@@ -7,7 +7,8 @@ from . import config
 from . import display
 from . import inputs
 from . import network
-from .modes import core_modes, messages
+from .modes import core_modes, messages, apps, media
+from .games import snake
 
 def main():
     print(f"🤖 Starting {config.IDENTITY}...")
@@ -153,24 +154,98 @@ def main():
                             if action.startswith("MODE:"):
                                 new_mode = action.split(":")[1]
                                 state["current_mode"] = new_mode
+                                # Snake Init
+                                if new_mode == "SNAKE":
+                                    state["snake"] = snake.SnakeGame(config.WIDTH, config.HEIGHT)
+                                    
                             elif action.startswith("MENU:"):
-                                new_menu = action.split(":")[1]
-                                state["current_menu"] = new_menu
+                                menu_name = action.split(":")[1]
+                                state["menu_stack"].append(menu_name)
+                                state["current_menu"] = menu_name
+                                state["menu_page"] = 0
+                                
                             elif action == "BACK":
-                                # Simple back logic (go to MAIN or Face)
-                                if state["current_menu"] == "MAIN":
-                                    state["current_mode"] = "FACE"
+                                if len(state["menu_stack"]) > 1:
+                                    state["menu_stack"].pop()
+                                    state["current_menu"] = state["menu_stack"][-1]
+                                    state["menu_page"] = 0
                                 else:
-                                    state["current_menu"] = "MAIN"
+                                    state["current_mode"] = "FACE"
+                                    
+                            # --- APP ACTIONS ---
+                            elif action.startswith("FOCUS:"):
+                                mins = int(action.split(":")[1])
+                                apps.start_focus_timer(state, mins)
+                                
+                            elif action.startswith("SLIDESHOW:"):
+                                subdir = action.split(":")[1]
+                                media.start_slideshow(state, subdir)
+                            
+                            elif action.startswith("GIF:"):
+                                 # Map GIF to Slideshow logic or ignore for now
+                                 pass
+                                 
+                            elif action.startswith("SYSTEM:"):
+                                cmd = action.split(":")[1]
+                                if cmd == "REBOOT":
+                                    os.system("sudo reboot")
+                                    
+                            elif action.startswith("BRIGHTNESS:"):
+                                try:
+                                    val = float(action.split(":")[1])
+                                    with open("/sys/class/backlight/rpi_backlight/brightness", "w") as f:
+                                        f.write(str(int(val * 255)))
+                                    state["brightness"] = val
+                                    config.save_config(state)
+                                except: pass
+                                    
+                            elif action.startswith("SET_POWER:"):
+                                val = action.split(":")[1]
+                                state["power_save"] = (val == "ON")
+                                config.save_config(state)
+                                script = "power_save_on.sh" if state["power_save"] else "power_save_off.sh"
+                                path = os.path.join(config.BASE_DIR, script)
+                                if os.path.exists(path):
+                                    subprocess.run([path], shell=True)
+
                             state["needs_redraw"] = True
                             
                     elif mode == "MESSAGES":
                         messages.handle_touch(state, pos)
                         state["needs_redraw"] = True
+                        
+                    elif mode == "SNAKE":
+                        if state.get("snake"):
+                            res = state["snake"].handle_input(pos)
+                            if res == "EXIT":
+                                state["current_mode"] = "MENU"
+                        state["needs_redraw"] = True
+                    elif mode == "SLIDESHOW":
+                         # Exit slideshow on tap
+                         state["current_mode"] = "MENU"
+                    elif mode == "FOCUS":
+                         # Exit focus on tap (if finished)
+                         if state["focus"].get("active") == False:
+                             state["current_mode"] = "MENU"
+                    elif mode == "WEATHER" or mode == "ADVANCED_STATS" or mode == "NOTES":
+                         # Simple back on tap
+                         state["current_mode"] = "MENU"
             
             # Update Logic (Face Animation & Behaviors)
             if state["current_mode"] == "FACE":
                 core_modes.update_face(state)
+            elif state["current_mode"] == "SLIDESHOW":
+                media.update_slideshow(state)
+            elif state["current_mode"] == "SNAKE":
+                 if state.get("snake"):
+                     state["snake"].update()
+                     state["needs_redraw"] = True
+            elif state["current_mode"] == "FOCUS":
+                if state.get("focus") and state["focus"]["active"]:
+                     if time.time() > state["focus"]["end_time"]:
+                         state["needs_redraw"] = True
+                     elif int(time.time()) % 1 == 0:
+                         state["needs_redraw"] = True
             
             # Redraw if needed
             current_time = time.time()
@@ -193,20 +268,31 @@ def main():
                 # Draw Mode
                 mode = state["current_mode"]
                 
-                if mode == "FACE":
+                if state["current_mode"] == "FACE":
                     core_modes.draw_face(screen, state)
-                elif mode == "MENU":
+                elif state["current_mode"] == "MENU":
                     core_modes.draw_menu(screen, state)
-                elif mode == "CLOCK":
+                elif state["current_mode"] == "CLOCK":
                     core_modes.draw_clock(screen, state)
-                elif mode == "MESSAGES":
+                elif state["current_mode"] == "MESSAGES":
                     messages.draw_messages(screen, state)
-                elif mode == "STATS": # ADVANCED_STATS
-                     # Not implemented fully yet, fallback
-                     core_modes.draw_stats(screen, state)
-                elif mode == "NOTES":
-                     # TODO
-                     pass
+                elif state["current_mode"] == "MESSAGE_VIEW":
+                    messages.draw_message_view(screen, state)
+                
+                # --- NEW APPS ---
+                elif state["current_mode"] == "ADVANCED_STATS":
+                    apps.draw_advanced_stats(screen, state)
+                elif state["current_mode"] == "WEATHER":
+                    apps.draw_weather(screen, state)
+                elif state["current_mode"] == "NOTES":
+                    apps.draw_notes(screen, state)
+                elif state["current_mode"] == "FOCUS":
+                    apps.draw_focus(screen, state)
+                elif state["current_mode"] == "SLIDESHOW":
+                    media.draw_slideshow(screen, state)
+                elif state["current_mode"] == "SNAKE":
+                    if state.get("snake"):
+                        state["snake"].draw(screen)
                 
                 # Push to Framebuffer
                 display.update_framebuffer(screen)

@@ -22,7 +22,7 @@ git push origin main
 
 # 2. Prepare Raspberry Pi (Force Clean)
 echo "🧹 Configuring Raspberry Pi environment..."
-ssh $SSH_TARGET "sudo chown -R pi:pi /home/pi/bmo && git config --global --add safe.directory /home/pi/bmo && cd /home/pi/bmo && git config receive.denyCurrentBranch updateInstead && git fetch && git reset --hard HEAD && git clean -fd && (pip3 install -r requirements.txt --break-system-packages || pip3 install -r requirements.txt)"
+ssh $SSH_TARGET "sudo chown -R pi:pi /home/pi/bmo && git config --global --add safe.directory /home/pi/bmo && cd /home/pi/bmo && git config receive.denyCurrentBranch updateInstead && git fetch && git reset --hard origin/main && git clean -fd && (pip3 install -r requirements.txt --break-system-packages || pip3 install -r requirements.txt)"
 
 # 3. Push to Raspberry Pi
 echo "📲 Pushing to BMO Device..."
