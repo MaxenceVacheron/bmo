@@ -613,12 +613,22 @@ def draw_weather(screen):
 def find_touch_device():
     """Dynamically find the touchscreen device"""
     from evdev import list_devices, InputDevice
-    devices = [InputDevice(path) for path in list_devices()]
-    for device in devices:
-        # Common names for the SPI touch controller
-        if "GT911" in device.name or "Goodix" in device.name or "TSC2007" in device.name:
-            print(f"🎯 Found Touchscreen: {device.name} at {device.path}")
-            return device.path
+    print("🔍 Searching for touchscreen devices...")
+    try:
+        devices = [InputDevice(path) for path in list_devices()]
+        for device in devices:
+            print(f"  - Found: {device.name} at {device.path}")
+            # Broad search for common touch controllers
+            name_lower = device.name.lower()
+            if any(key in name_lower for key in ["gt911", "goodix", "tsc2007", "touchscreen", "ads7846", "input"]):
+                print(f"🎯 MATCH FOUND: {device.name} at {device.path}")
+                sys.stdout.flush()
+                return device.path
+    except Exception as e:
+        print(f"❌ Device Discovery Error: {e}")
+    
+    print("⚠️ No touch device matched. Falling back to /dev/input/event4")
+    sys.stdout.flush()
     # Fallback to the known default if detection fails
     return "/dev/input/event4"
 
