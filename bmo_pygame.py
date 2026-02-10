@@ -352,6 +352,9 @@ def load_messages():
                         any_unread = True
                         break
                 state["messages"]["unread"] = any_unread
+                
+                # Ensure they are sorted Newest -> Oldest
+                state["messages"]["list"].sort(key=lambda x: x.get("timestamp", 0), reverse=True)
         except Exception as e:
             print(f"Error loading messages: {e}")
 
