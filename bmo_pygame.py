@@ -455,8 +455,7 @@ def sync_messages():
 def send_read_receipt(msg_id):
     """Notify the API that a message has been read"""
     try:
-        # Add +1h (3600s) to match server expectation
-        read_time = int(time.time()) + 3600
+        read_time = int(time.time()) 
         
         data = json.dumps({
             "message_id": msg_id,
