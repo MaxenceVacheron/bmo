@@ -290,7 +290,7 @@ state = {
     "snake": None, # Will hold SnakeGame instance
     "cached_dim_surf": None,
     "last_brightness": -1.0,
-    "tap_times": [], # For 5-tap shortcut
+    "tap_times": [], # For 10-tap shortcut
     "power_save": False,
     "weather": {
         "temp": "--",
@@ -1875,7 +1875,8 @@ def handle_compose_touch(pos):
                 # SEND
                 msg = state["compose"]["text"].strip()
                 if msg:
-                    threading.Thread(target=send_message, args=(msg, state["compose"]["reply_to_id"]), daemon=True).start()
+                    recipient = state["compose"].get("recipient", "AMO")
+                    threading.Thread(target=send_message, args=(msg, recipient), daemon=True).start()
                     state["compose"]["text"] = ""
                     state["compose"]["last_key"] = None
                     state["mode"] = "MESSAGES"
@@ -1914,20 +1915,20 @@ def update_t9_candidates():
     if buf in T9_DICT:
         state["compose"]["candidates"] = T9_DICT[buf][:5]
 
-def send_message(text, reply_to_id=None):
+def send_message(text, recipient="AMO"):
     """Send message to API"""
     try:
-        print(f"📤 Sending: {text}")
+        print(f"📤 Sending to {recipient}: {text}")
         sys.stdout.flush()
         
         data = json.dumps({
             "content": text,
             "sender": "BMO",
-            "reply_to": reply_to_id,
+            "recipient": recipient,
             "timestamp": int(time.time())
         }).encode('utf-8')
         
-        req = urllib.request.Request(MESSAGES_URL, data=data, method='POST')
+        req = urllib.request.Request(MESSAGES_URL + "/send", data=data, method='POST')
         req.add_header('Content-Type', 'application/json')
         auth = base64.b64encode(b"BMO:BMO").decode("ascii")
         req.add_header('Authorization', f"Basic {auth}")
@@ -2099,9 +2100,9 @@ def main():
                     state["needs_redraw"] = True
 
                 state["tap_times"].append(now)
-                state["tap_times"] = state["tap_times"][-5:]
+                state["tap_times"] = state["tap_times"][-10:]
                 
-                if len(state["tap_times"]) == 5:
+                if len(state["tap_times"]) == 10:
                     if state["tap_times"][-1] - state["tap_times"][0] < 2.0:
                         auto_update_and_restart()
 
@@ -2369,6 +2370,7 @@ def main():
                         state["compose"]["text"] = ""
                         state["compose"]["buffer"] = ""
                         state["compose"]["reply_to_id"] = state["messages"]["viewing_id"]
+                        state["compose"]["recipient"] = sender
                         state["needs_redraw"] = True
                     else:
                         # All other clicks return to inbox (Back)
