@@ -4,7 +4,8 @@ set -e
 
 # Configuration
 # Set to specific IP if needed (e.g. "172.24.13.4"), or leave empty to use "bmo" alias from ssh config
-BMO_IP=""
+BMO_IP="172.24.13.4"
+# BMO_IP=""
 
 if [ -n "$BMO_IP" ]; then
     SSH_TARGET="pi@$BMO_IP"
@@ -47,7 +48,7 @@ git reset --hard HEAD
 sudo systemctl daemon-reload
 # Sync service files
 sudo cp /home/pi/bmo/bmo.service /etc/systemd/system/bmo.service
-sudo cp /home/pi/bmo/bmo-mirror.service /etc/systemd/system/bmo-mirror.service
+# sudo cp /home/pi/bmo/bmo-mirror.service /etc/systemd/system/bmo-mirror.service
 sudo systemctl daemon-reload
 sudo systemctl restart bmo.service
 echo "✅ Service restarted!"
