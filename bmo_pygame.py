@@ -98,6 +98,17 @@ LOVE_NOTES = [
     "You look great today!",
 ]
 
+FOCUS_CELEBRATION_SENTENCES = [
+    "Yay!",
+    "Well done!",
+    "Time to take a break",
+    "Great focus!",
+    "You did it!",
+    "Champion!",
+    "Relax now...",
+    "Good job!",
+]
+
 # --- T9 KEYBOARD DATA ---
 T9_MAPPING = {
     '1': '.,!1', '2': 'abc2', '3': 'def3',
@@ -272,7 +283,8 @@ state = {
         "end_time": 0,
         "duration": 0,
         "active": False,
-        "blink_timer": 0
+        "blink_timer": 0,
+        "showing_confirmation": False
     },
     "gif_player": {
         "path": "",
@@ -1208,7 +1220,8 @@ def start_focus_timer(minutes):
     state["focus"]["duration"] = minutes * 60
     state["focus"]["end_time"] = time.time() + (minutes * 60)
     state["focus"]["active"] = True
-    state["mode"] = "FOCUS"
+    state["focus"]["showing_confirmation"] = False
+    state["mode"] = "FACE"
 
 def draw_focus_face(screen):
     screen.fill(TEAL)
@@ -1274,10 +1287,52 @@ def draw_focus_face(screen):
 
 # --- COMMON DRAWING ---
 def update_face():
-    """Update BMO's face state (blinking, image rotation, and needs)"""
+    # Update BMO's face state (blinking, image rotation, and needs)
     now = time.time()
     
-    # --- NEEDS DECAY ---
+    # FOCUS CHECK
+    if state["focus"]["active"]:
+        remaining = state["focus"]["end_time"] - now
+        if remaining <= 0:
+            # Time's Up! Celebrate!
+            state["focus"]["active"] = False
+            state["focus"]["showing_confirmation"] = False
+            
+            # Pick standard positive face
+            load_random_face(emotion="positive")
+            # Set random quote
+            quote = random.choice(FOCUS_CELEBRATION_SENTENCES)
+            state["idle"]["thought"]["is_active"] = True
+            
+            # Create a simple surface for the thought if we don't have an image
+            # (Or just reuse load_thought_bubble logic if you have text assets, 
+            # but here we might want to render text dynamically. 
+            # For simplicity, let's just use the Thought Bubble mechanism if possible 
+            # OR just override the love note logic)
+            
+            state["love_note"] = quote # Use Love Note mechanism if available? 
+            # Actually, standard thought bubbles are images. 
+            # Let's just spawn hearts and maybe show the text as a special overlay?
+            
+            # For now: Spawn Hearts & Force Happy Face
+            for _ in range(10):
+                spawn_hearts(random.randint(50, 430), random.randint(50, 270))
+            
+            # We can't easily generate a text image for the thought bubble without PIL/Font logic 
+            # mapped to that system. Let's just print it to console for now 
+            # or maybe show it as a temporary subtitle?
+            # Existing system uses pre-rendered images for thought bubbles.
+            # Let's just switch to text viewer potentially? No, that's intrusive.
+            
+            # Let's just use the existing thought bubble system but force a "Heart" one if we can,
+            # or just let the face express it.
+            load_thought_bubble() 
+            state["needs_redraw"] = True
+            
+            # Optional: Show a "COMPLETED" overlay for a few seconds?
+            # Let's keep it simple: Just happiness and return to normal.
+            
+    # Blinking Logic (Standard)NEEDS DECAY ---
     # Decay every 30 seconds for performance
     if now - state["needs"]["last_decay"] > 30:
         elapsed_mins = (now - state["needs"]["last_decay"]) / 60.0
@@ -1464,6 +1519,47 @@ def draw_face(screen):
         pygame.draw.circle(screen, PINK, (int(hx-4), int(hy)), 5)
         pygame.draw.circle(screen, PINK, (int(hx+4), int(hy)), 5)
         pygame.draw.polygon(screen, PINK, [(int(hx-9), int(hy+2)), (int(hx+9), int(hy+2)), (int(hx), int(hy+10))])
+
+    # 5. FOCUS OVERLAY
+    if state["focus"]["active"]:
+        # Timer at bottom center
+        remaining = max(0, state["focus"]["end_time"] - time.time())
+        mins = int(remaining // 60)
+        secs = int(remaining % 60)
+        timer_txt = f"{mins:02d}:{secs:02d}"
+        
+        # Text with background for readability
+        txt = FONT_MEDIUM.render(timer_txt, False, WHITE)
+        bg_rect = (WIDTH//2 - txt.get_width()//2 - 10, HEIGHT - 50, txt.get_width() + 20, 30)
+        pygame.draw.rect(screen, (0,0,0,180), bg_rect, border_radius=5)
+        screen.blit(txt, (WIDTH//2 - txt.get_width()//2, HEIGHT - 48))
+        
+        # Progress Bar at very bottom (Grey/Black)
+        total = state["focus"]["duration"]
+        if total > 0:
+            progress = 1.0 - (remaining / total)
+            pygame.draw.rect(screen, (50, 50, 50), (0, HEIGHT - 10, WIDTH, 10)) # BG
+            pygame.draw.rect(screen, (150, 150, 150), (0, HEIGHT - 10, int(WIDTH * progress), 10)) # Fill
+            
+        # Confirmation Dialog
+        if state["focus"]["showing_confirmation"]:
+            # Dim background
+            overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 200))
+            screen.blit(overlay, (0,0))
+            
+            lbl = FONT_MEDIUM.render("Stop Focus?", False, WHITE)
+            screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, 80))
+            
+            # YES Button (Red)
+            pygame.draw.rect(screen, RED, (60, 160, 140, 60), border_radius=10)
+            lbl_yes = FONT_MEDIUM.render("YES", False, WHITE)
+            screen.blit(lbl_yes, (130 - lbl_yes.get_width()//2, 190 - lbl_yes.get_height()//2))
+            
+            # NO Button (Green)
+            pygame.draw.rect(screen, GREEN, (280, 160, 140, 60), border_radius=10)
+            lbl_no = FONT_MEDIUM.render("NO", False, WHITE)
+            screen.blit(lbl_no, (350 - lbl_no.get_width()//2, 190 - lbl_no.get_height()//2))
 
 def draw_click_crosshair(screen):
     """Draw a simple visual crosshair feedback at the last click position"""
@@ -2070,8 +2166,8 @@ def main():
     while running:
         current_time = time.time()
         
-        # Random GIF Logic (only in FACE/HOME mode)
-        if state["mode"] == "FACE":
+        # Random GIF Logic (only in FACE/HOME mode, AND NOT FOCUSED)
+        if state["mode"] == "FACE" and not state["focus"]["active"]:
             if current_time - state["random_gif"]["last_trigger"] > 60:
                 trigger_random_gif()
                 state["random_gif"]["last_trigger"] = current_time
@@ -2124,6 +2220,24 @@ def main():
                 if state["mode"] == "STARTUP":
                     switch_to_face_mode()
                 elif state["mode"] == "FACE":
+                    # Handle FOCUS Interaction
+                    if state["focus"]["active"]:
+                        if state["focus"]["showing_confirmation"]:
+                            # Handle YES/NO
+                            if 160 < y < 220:
+                                if 60 < x < 200: # YES (Stop)
+                                    state["focus"]["active"] = False
+                                    state["focus"]["showing_confirmation"] = False
+                                    state["mode"] = "MENU"
+                                elif 280 < x < 420: # NO (Resume)
+                                    state["focus"]["showing_confirmation"] = False
+                        else:
+                            # Tap anywhere to show confirmation
+                            state["focus"]["showing_confirmation"] = True
+                        
+                        state["needs_redraw"] = True
+                        continue
+
                     # If tapping face, toggle interaction UI
                     if WIDTH/4 < x < 3*WIDTH/3 and HEIGHT/4 < y < 3*HEIGHT/4:
                         state["needs"]["show_interaction"] = not state["needs"]["show_interaction"]
