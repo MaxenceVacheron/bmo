@@ -358,6 +358,25 @@ def load_messages():
         except Exception as e:
             print(f"Error loading messages: {e}")
 
+def flash_screen():
+    """Flash screen brightness to notify user"""
+    try:
+        original = state["brightness"]
+        # Determine flash target (invert simplistic)
+        target = 1.0 if original < 0.5 else 0.1
+        
+        # Flash sequence: Target -> Original -> Target -> Original
+        for _ in range(2):
+            state["brightness"] = target
+            state["needs_redraw"] = True
+            time.sleep(0.2)
+            state["brightness"] = original
+            state["needs_redraw"] = True
+            time.sleep(0.2)
+            
+    except Exception as e:
+        print(f"Flash Error: {e}")
+
 def save_messages():
     """Save messages to local storage"""
     try:
@@ -419,6 +438,10 @@ def sync_messages():
                     state["needs_redraw"] = True
                     print(f"📩 Received {len(new_msgs)} messages!")
                     sys.stdout.flush()
+                    
+                    # Trigger Flash in separate thread
+                    threading.Thread(target=flash_screen, daemon=True).start()
+                    
                 return True
     except Exception as e:
         print(f"Sync Error: {e}")
