@@ -373,6 +373,10 @@ def flash_screen():
             state["brightness"] = original
             state["needs_redraw"] = True
             time.sleep(0.2)
+        
+        # Ensure we end on original
+        state["brightness"] = original
+        state["needs_redraw"] = True
             
     except Exception as e:
         print(f"Flash Error: {e}")
@@ -1669,11 +1673,19 @@ def draw_message_view(screen):
     s_col, s_row = 15, 10 
     
     # Minimalist Fullscreen Layout
-    # Date at top right
+    
+    # 1. Header (Sender Top Left, Date Top Right)
+    sender = msg.get("sender", "Unknown")
     ts = msg.get("timestamp", 0)
     formatted_date = time.strftime("%d/%m %H:%M", time.localtime(ts)) if ts else ""
+    
+    # Sender
+    lbl_s = FONT_SMALL.render(sender, False, BLACK)
+    screen.blit(lbl_s, (20, 10))
+    
+    # Date
     date_surf = FONT_TINY.render(formatted_date, False, GRAY)
-    screen.blit(date_surf, (WIDTH - 20 - date_surf.get_width(), 10))
+    screen.blit(date_surf, (WIDTH - 20 - date_surf.get_width(), 15)) # Align baseline roughly
     
     # Typewriter Effect
     content = msg.get("content", "")
@@ -1718,19 +1730,20 @@ def draw_message_view(screen):
         x = (WIDTH - surf.get_width()) // 2
         screen.blit(surf, (x, start_y + i * line_h))
     
-    # Sender as signature bottom right
-    sender = msg.get("sender", "Unknown")
-    sig = FONT_TINY.render(f"- {sender}", False, GRAY)
-    screen.blit(sig, (WIDTH - 30 - sig.get_width(), HEIGHT - 30))
+    # Sender was moved to top
+    # sender = msg.get("sender", "Unknown")
+    # sig = FONT_TINY.render(f"- {sender}", False, GRAY)
+    # screen.blit(sig, (WIDTH - 30 - sig.get_width(), HEIGHT - 30))
     
     # Subtle Back interaction hint (no big buttons)
     hint = FONT_TINY.render("< TAP TO CLOSE", False, (200, 200, 200))
     screen.blit(hint, (20, HEIGHT - 30))
         
-    # REPLY Button
-    pygame.draw.rect(screen, TEAL, (WIDTH - 100, HEIGHT - 40, 80, 30), border_radius=5)
-    lbl = FONT_TINY.render("REPLY", False, WHITE)
-    screen.blit(lbl, (WIDTH - 60 - lbl.get_width()//2, HEIGHT - 33))
+    # REPLY Button - ONLY for AMO
+    if sender == "AMO":
+        pygame.draw.rect(screen, TEAL, (WIDTH - 100, HEIGHT - 40, 80, 30), border_radius=5)
+        lbl = FONT_TINY.render("REPLY", False, WHITE)
+        screen.blit(lbl, (WIDTH - 60 - lbl.get_width()//2, HEIGHT - 33))
         
 
 
@@ -2348,7 +2361,11 @@ def main():
                 
                 elif state["mode"] == "MESSAGE_VIEW":
                     # Check Reply Button
-                    if x > WIDTH - 100 and y > HEIGHT - 40:
+                    msg_id = state["messages"]["viewing_id"]
+                    msg = next((m for m in state["messages"]["list"] if m["id"] == msg_id), None)
+                    sender = msg.get("sender", "Unknown") if msg else "Unknown"
+
+                    if sender == "AMO" and x > WIDTH - 100 and y > HEIGHT - 40:
                         state["mode"] = "COMPOSE"
                         state["compose"]["text"] = ""
                         state["compose"]["buffer"] = ""
