@@ -1704,7 +1704,10 @@ def draw_messages_menu(screen):
     title = FONT_MEDIUM.render("BMO INBOX", False, WHITE)
     screen.blit(title, (WIDTH//2 - title.get_width()//2, 10))
     
-    msgs = state["messages"]["list"]
+    all_msgs = state["messages"]["list"]
+    # Filter out messages sent by BMO
+    msgs = [m for m in all_msgs if m.get("sender") != "BMO"]
+    
     if not msgs:
         lbl = FONT_SMALL.render("No messages yet!", False, BLACK)
         screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, HEIGHT//2))
@@ -1736,6 +1739,10 @@ def draw_messages_menu(screen):
             screen.blit(lbl_s, (40, y + 5))
             screen.blit(lbl_t, (WIDTH - 40 - lbl_t.get_width(), y + 5))
             screen.blit(lbl_c, (40, y + 22))
+            
+            # UNREAD INDICATOR (Red Dot)
+            if not m.get("read", False):
+                pygame.draw.circle(screen, RED, (rect[0] + rect[2] - 15, rect[1] + 15), 5)
             
         # Draw Nav
         nav_y = 280
@@ -2442,7 +2449,9 @@ def main():
                             state["mode"] = "MENU"
                         elif x < 100 and state["menu_page"] > 0: state["menu_page"] -= 1
                         elif x > WIDTH - 100:
-                            if len(state["messages"]["list"]) > (state["menu_page"] + 1) * 4:
+                            # Use filtered list for pagination check
+                            filtered_msgs = [m for m in state["messages"]["list"] if m.get("sender") != "BMO"]
+                            if len(filtered_msgs) > (state["menu_page"] + 1) * 4:
                                 state["menu_page"] += 1
                     # Manual Fetch
                     elif 0 <= y <= 50 and x > WIDTH - 100:
@@ -2451,8 +2460,11 @@ def main():
                     elif 60 <= y < 280:
                         idx = (y - 60) // 55
                         real_idx = (state["menu_page"] * 4) + int(idx)
-                        if real_idx < len(state["messages"]["list"]):
-                            msg = state["messages"]["list"][real_idx]
+                        
+                        filtered_msgs = [m for m in state["messages"]["list"] if m.get("sender") != "BMO"]
+                        
+                        if real_idx < len(filtered_msgs):
+                            msg = filtered_msgs[real_idx]
                             msg_id = msg["id"]
                             state["messages"]["viewing_id"] = msg_id
                             
