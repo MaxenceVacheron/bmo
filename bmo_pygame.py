@@ -143,16 +143,16 @@ MENUS = {
     "MAIN": [
         {"label": "HOME", "action": "MODE:FACE", "color": TEAL},
         {"label": "MESSAGES", "action": "MODE:MESSAGES", "color": PINK},
+        {"label": "FOCUS", "action": "MENU:FOCUS", "color": GREEN},
+        {"label": "DIAPO", "action": "MENU:NEXTCLOUD", "color": BLUE},
+        # Page 2
         {"label": "WEATHER", "action": "MODE:WEATHER", "color": BLUE},
         {"label": "CLOCK", "action": "MODE:CLOCK", "color": BLUE},
-        # Page 2
-        {"label": "FOCUS", "action": "MENU:FOCUS", "color": GREEN},
         {"label": "GAMES", "action": "MENU:GAMES", "color": YELLOW},
+        {"label": "HEART", "action": "MODE:HEART", "color": PINK},
+        # Page 3
         {"label": "SYSTEM", "action": "MODE:ADVANCED_STATS", "color": GRAY},
         {"label": "NOTES", "action": "MODE:NOTES", "color": RED},
-        # Page 3
-        {"label": "HEART", "action": "MODE:HEART", "color": PINK},
-        {"label": "NEXTCLOUD", "action": "MENU:NEXTCLOUD", "color": BLUE},
         {"label": "SETTINGS", "action": "MENU:SETTINGS", "color": GRAY},
     ],
     "GAMES": [
@@ -420,11 +420,17 @@ def sync_messages():
                 
                 existing_ids = {m["id"] for m in state["messages"]["list"]}
                 added = False
+                new_incoming = False
                 for m in new_msgs:
                     if m["id"] not in existing_ids:
                         state["messages"]["list"].append(m)
                         if not m.get("read", False):
                             state["messages"]["unread"] = True
+                        
+                        # Only flag as added if it is NOT from BMO
+                        if m.get("sender") != "BMO":
+                            new_incoming = True
+                        
                         added = True
                     else:
                         # Update read status if changed
@@ -452,11 +458,13 @@ def sync_messages():
                     state["messages"]["list"].sort(key=lambda x: x.get("timestamp", 0), reverse=True)
                     save_messages()
                     state["needs_redraw"] = True
-                    print(f"📩 Received {len(new_msgs)} messages!")
-                    sys.stdout.flush()
                     
-                    # Trigger Flash in separate thread
-                    threading.Thread(target=flash_screen, daemon=True).start()
+                    if new_incoming:
+                        print(f"📩 Received {len(new_msgs)} messages!")
+                        sys.stdout.flush()
+                        
+                        # Trigger Flash in separate thread
+                        threading.Thread(target=flash_screen, daemon=True).start()
                     
                 return True
     except Exception as e:
