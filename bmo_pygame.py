@@ -2035,6 +2035,12 @@ def main():
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = event.pos
                 now = time.time()
+                
+                # Wake up from Eco Mode
+                if state.get("power_save", False) and state["brightness"] < 1.0:
+                    state["brightness"] = 1.0
+                    state["needs_redraw"] = True
+
                 state["tap_times"].append(now)
                 state["tap_times"] = state["tap_times"][-5:]
                 
