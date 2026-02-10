@@ -344,7 +344,14 @@ def load_messages():
             with open(MESSAGES_FILE, 'r') as f:
                 data = json.load(f)
                 state["messages"]["list"] = data.get("messages", [])
-                # Check for unread (just a concept for now, maybe compare with last read ID)
+                
+                # Check for unread
+                any_unread = False
+                for m in state["messages"]["list"]:
+                    if not m.get("read", False):
+                        any_unread = True
+                        break
+                state["messages"]["unread"] = any_unread
         except Exception as e:
             print(f"Error loading messages: {e}")
 
@@ -390,6 +397,18 @@ def sync_messages():
                                     # If all messages are read, clear notification? 
                                     # (Optimization for later, but good for now)
 
+                
+
+                # Recalculate unread status based on full local list
+                any_unread = False
+                for m in state["messages"]["list"]:
+                    if not m.get("read", False):
+                        any_unread = True
+                        break
+                
+                if state["messages"]["unread"] != any_unread:
+                    state["messages"]["unread"] = any_unread
+                    state["needs_redraw"] = True
                 
                 if added:
                     state["messages"]["list"].sort(key=lambda x: x.get("timestamp", 0), reverse=True)
@@ -2088,10 +2107,23 @@ def main():
                         # Shortcut for messages notification (bottom right "!")
                         if state["messages"]["unread"] and x > WIDTH - 60 and y > HEIGHT - 60:
                             if state["messages"]["list"]:
-                                # Open the most recent message
-                                msg_id = state["messages"]["list"][0]["id"]
+                                # Open the most recent UNREAD message, or just the top one
+                                msg = next((m for m in state["messages"]["list"] if not m.get("read", False)), state["messages"]["list"][0])
+                                msg_id = msg["id"]
                                 state["messages"]["viewing_id"] = msg_id
-                                state["messages"]["unread"] = False
+                                
+                                # Mark as read locally
+                                msg["read"] = True
+                                save_messages()
+                                
+                                # Recalculate unread status
+                                any_unread = False
+                                for m in state["messages"]["list"]:
+                                    if not m.get("read", False):
+                                        any_unread = True
+                                        break
+                                state["messages"]["unread"] = any_unread
+                                
                                 state["messages"]["view_start_time"] = time.time()
                                 state["mode"] = "MESSAGE_VIEW"
                                 # Send read receipt
@@ -2150,7 +2182,8 @@ def main():
                         elif action.startswith("MODE:"):
                             state["mode"] = action.split(":")[1]
                             state["menu_page"] = 0
-                            if state["mode"] == "MESSAGES": state["messages"]["unread"] = False # Mark inbox as seen
+                            if state["mode"] == "MESSAGES": pass
+                            # if state["mode"] == "MESSAGES": state["messages"]["unread"] = False # Mark inbox as seen
                             if state["mode"] == "NOTES": state["love_note"] = random.choice(LOVE_NOTES)
                             if state["mode"] == "SNAKE": state["snake"] = None # Reset game
                         elif action.startswith("SLIDESHOW:"):
@@ -2266,8 +2299,22 @@ def main():
                         idx = (y - 60) // 55
                         real_idx = (state["menu_page"] * 4) + int(idx)
                         if real_idx < len(state["messages"]["list"]):
-                            msg_id = state["messages"]["list"][real_idx]["id"]
+                            msg = state["messages"]["list"][real_idx]
+                            msg_id = msg["id"]
                             state["messages"]["viewing_id"] = msg_id
+                            
+                            # Mark as read locally
+                            msg["read"] = True
+                            save_messages()
+                            
+                            # Recalculate unread status
+                            any_unread = False
+                            for m in state["messages"]["list"]:
+                                if not m.get("read", False):
+                                    any_unread = True
+                                    break
+                            state["messages"]["unread"] = any_unread
+                            
                             state["messages"]["view_start_time"] = time.time()
                             state["mode"] = "MESSAGE_VIEW"
                             # Send read receipt
