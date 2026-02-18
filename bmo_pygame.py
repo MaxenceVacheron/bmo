@@ -1267,7 +1267,7 @@ def start_focus_timer(minutes):
     state["mode"] = "FACE"
 
 def draw_focus_face(screen):
-    screen.fill(TEAL)
+    screen.fill(BLACK)
     
     remaining = state["focus"]["end_time"] - time.time()
     
@@ -1277,46 +1277,46 @@ def draw_focus_face(screen):
         
         # Happy Face (Eyes Closed >_< or Excitement)
         # Left Eye (>)
-        pygame.draw.lines(screen, BLACK, False, [(125, 110), (140, 125), (125, 140)], 5)
+        pygame.draw.lines(screen, WHITE, False, [(125, 110), (140, 125), (125, 140)], 5)
         # Right Eye (<)
-        pygame.draw.lines(screen, BLACK, False, [(355, 110), (340, 125), (355, 140)], 5)
+        pygame.draw.lines(screen, WHITE, False, [(355, 110), (340, 125), (355, 140)], 5)
         
         # Mouth (Open D)
-        pygame.draw.circle(screen, BLACK, (240, 200), 40) # Filled mouth
-        pygame.draw.rect(screen, TEAL, (200, 160, 80, 40)) # Cut top half
+        pygame.draw.circle(screen, WHITE, (240, 200), 40) # Filled mouth
+        pygame.draw.rect(screen, BLACK, (200, 160, 80, 40)) # Cut top half
         
         # Text
-        txt = FONT_MEDIUM.render("GOOD JOB!", True, BLACK)
+        txt = FONT_MEDIUM.render("GOOD JOB!", True, WHITE)
         screen.blit(txt, (WIDTH//2 - txt.get_width()//2, 50))
         
-        hint = FONT_SMALL.render("Tap to finish", True, BLACK)
+        hint = FONT_SMALL.render("Tap to finish", True, WHITE)
         screen.blit(hint, (WIDTH//2 - hint.get_width()//2, 280))
         
         return
 
     # Focus Mode (Glasses)
     # Glasses Frames (Squares)
-    pygame.draw.rect(screen, BLACK, (110, 90, 60, 60), 4) # Left lens
-    pygame.draw.rect(screen, BLACK, (310, 90, 60, 60), 4) # Right lens
+    pygame.draw.rect(screen, WHITE, (110, 90, 60, 60), 4) # Left lens
+    pygame.draw.rect(screen, WHITE, (310, 90, 60, 60), 4) # Right lens
     # Bridge
-    pygame.draw.line(screen, BLACK, (170, 120), (310, 120), 4)
+    pygame.draw.line(screen, WHITE, (170, 120), (310, 120), 4)
     # Sides
-    pygame.draw.line(screen, BLACK, (110, 120), (60, 110), 4)
-    pygame.draw.line(screen, BLACK, (370, 120), (420, 110), 4)
+    pygame.draw.line(screen, WHITE, (110, 120), (60, 110), 4)
+    pygame.draw.line(screen, WHITE, (370, 120), (420, 110), 4)
     
     # Eyes (Small dots focused)
-    pygame.draw.circle(screen, BLACK, (140, 120), 5)
-    pygame.draw.circle(screen, BLACK, (340, 120), 5)
+    pygame.draw.circle(screen, WHITE, (140, 120), 5)
+    pygame.draw.circle(screen, WHITE, (340, 120), 5)
     
     # Mouth (Concentrated line)
-    pygame.draw.line(screen, BLACK, (220, 200), (260, 200), 4)
+    # pygame.draw.line(screen, BLACK, (220, 200), (260, 200), 4)
     
     # Timer Text
     mins = int(remaining // 60)
     secs = int(remaining % 60)
     timer_txt = f"{mins:02d}:{secs:02d}"
     
-    txt = FONT_MEDIUM.render(timer_txt, True, BLACK)
+    txt = FONT_MEDIUM.render(timer_txt, True, WHITE)
     # Background for timer text for readability
     # pygame.draw.rect(screen, WHITE, (WIDTH//2 - 50, 250, 100, 40))
     screen.blit(txt, (WIDTH//2 - txt.get_width()//2, 260))
@@ -1324,7 +1324,7 @@ def draw_focus_face(screen):
     # Progress Bar at bottom
     total = state["focus"]["duration"]
     progress = 1.0 - (remaining / total)
-    pygame.draw.rect(screen, BLACK, (40, 300, 400, 10), 1)
+    pygame.draw.rect(screen, WHITE, (40, 300, 400, 10), 1)
     pygame.draw.rect(screen, GREEN, (41, 301, int(398 * progress), 8))
 
 
@@ -1984,19 +1984,19 @@ def draw_focus_face(screen):
         
         # Happy Face (Eyes Closed >_< or Excitement)
         # Left Eye (>)
-        pygame.draw.lines(screen, BLACK, False, [(125, 110), (140, 125), (125, 140)], 5)
+        pygame.draw.lines(screen, WHITE, False, [(125, 110), (140, 125), (125, 140)], 5)
         # Right Eye (<)
-        pygame.draw.lines(screen, BLACK, False, [(355, 110), (340, 125), (355, 140)], 5)
+        pygame.draw.lines(screen, WHITE, False, [(355, 110), (340, 125), (355, 140)], 5)
         
         # Mouth (Open D)
-        pygame.draw.circle(screen, BLACK, (240, 200), 40) # Filled mouth
-        pygame.draw.rect(screen, TEAL, (200, 160, 80, 40)) # Cut top half
+        pygame.draw.circle(screen, WHITE, (240, 200), 40) # Filled mouth
+        pygame.draw.rect(screen, BLACK, (200, 160, 80, 40)) # Cut top half
         
         # Text
-        txt = FONT_MEDIUM.render("GOOD JOB!", True, BLACK)
+        txt = FONT_MEDIUM.render("GOOD JOB!", True, WHITE)
         screen.blit(txt, (WIDTH//2 - txt.get_width()//2, 50))
         
-        hint = FONT_SMALL.render("Tap to finish", True, BLACK)
+        hint = FONT_SMALL.render("Tap to finish", True, WHITE)
         screen.blit(hint, (WIDTH//2 - hint.get_width()//2, 280))
         
         return
