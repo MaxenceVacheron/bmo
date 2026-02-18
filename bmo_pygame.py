@@ -2820,9 +2820,6 @@ def main():
     os.close(fb_fd)
     pygame.quit()
 
-if __name__ == "__main__":
-    main()
-
 def draw_focus_custom(screen):
     """Draw a numeric keypad to enter custom focus minutes"""
     screen.fill(WHITE)
@@ -2915,3 +2912,7 @@ def handle_focus_custom_touch(pos):
                     state["focus"]["custom_input"] = state["focus"]["custom_input"][:-1]
         
     state["needs_redraw"] = True
+
+if __name__ == "__main__":
+    main()
+
