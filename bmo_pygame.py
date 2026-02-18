@@ -2721,10 +2721,24 @@ def main():
         
         # --- UPDATE PHASE ---
         now = time.time()
+        
+        # Check if Message View is currently typing
+        is_typing_message = False
+        if state["mode"] == "MESSAGE_VIEW":
+             msg_id = state["messages"]["viewing_id"]
+             msg = next((m for m in state["messages"]["list"] if m["id"] == msg_id), None)
+             if msg:
+                 content = msg.get("content", "")
+                 start_t = state["messages"].get("view_start_time", 0)
+                 elapsed = now - start_t
+                 chars_to_show = int(elapsed * 30)
+                 if chars_to_show < len(content) + 5: # Small buffer for cursor
+                     is_typing_message = True
+
         # modes that need high-frequency updates
-        needs_high_fps = state["mode"] in ["SNAKE", "GIF_PLAYER", "RANDOM_GIF"]
+        needs_high_fps = state["mode"] in ["SNAKE", "GIF_PLAYER", "RANDOM_GIF"] or is_typing_message
         # modes that need low-frequency updates (e.g. once per second or interaction)
-        is_slow_mode = state["mode"] in ["CLOCK", "FOCUS", "ADVANCED_STATS", "MESSAGE_VIEW", "COMPOSE"]
+        is_slow_mode = state["mode"] in ["CLOCK", "FOCUS", "ADVANCED_STATS", "MESSAGE_VIEW", "COMPOSE"] and not is_typing_message
         
         always_update = needs_high_fps or (is_slow_mode and int(now) != int(now - (1/current_fps)))
         
@@ -2823,6 +2837,9 @@ def main():
                 current_fps = 2 # Reduced from 5
             else:
                 current_fps = state.get("face_target_fps", 10)
+        elif state["mode"] == "MESSAGE_VIEW":
+             # Boost FPS for typewriter effect
+             current_fps = 30 if needs_high_fps else 10
         elif state["mode"] in ["MENU", "STATS", "SETTINGS", "GAMES", "FACE_FPS", "BRIGHTNESS", "POWER", "DEFAULT_MODE", "NEXTCLOUD", "D_PHOTO", "D_GIF", "D_TEXT"]:
              # Low FPS for static menus
              current_fps = 10
