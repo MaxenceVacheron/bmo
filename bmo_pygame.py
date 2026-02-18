@@ -2736,9 +2736,9 @@ def main():
                      is_typing_message = True
 
         # modes that need high-frequency updates
-        needs_high_fps = state["mode"] in ["SNAKE", "GIF_PLAYER", "RANDOM_GIF"] or is_typing_message
+        needs_high_fps = state["mode"] in ["SNAKE", "GIF_PLAYER", "RANDOM_GIF", "STARTUP", "HEART"] or is_typing_message
         # modes that need low-frequency updates (e.g. once per second or interaction)
-        is_slow_mode = state["mode"] in ["CLOCK", "FOCUS", "ADVANCED_STATS", "MESSAGE_VIEW", "COMPOSE"] and not is_typing_message
+        is_slow_mode = state["mode"] in ["CLOCK", "FOCUS", "ADVANCED_STATS", "MESSAGE_VIEW", "COMPOSE", "SLIDESHOW"] and not is_typing_message
         
         always_update = needs_high_fps or (is_slow_mode and int(now) != int(now - (1/current_fps)))
         
