@@ -2445,6 +2445,8 @@ def main():
                         elif action.startswith("MODE:"):
                             state["mode"] = action.split(":")[1]
                             state["menu_page"] = 0
+                            if state["mode"] == "FACE":
+                                load_random_face()
                             if state["mode"] == "MESSAGES": pass
                             # if state["mode"] == "MESSAGES": state["messages"]["unread"] = False # Mark inbox as seen
                             if state["mode"] == "NOTES": state["love_note"] = random.choice(LOVE_NOTES)
