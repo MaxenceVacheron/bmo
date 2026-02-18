@@ -1674,8 +1674,16 @@ def draw_menu(screen):
         color = item.get("color", GRAY)
         if item["action"] == "BACK" or item["label"] == "EXIT":
              color = RED
+        
+        # Highlight selected Face FPS
+        if item["action"] == f"SET_FACE_FPS:{state.get('face_target_fps', 30)}":
+             color = YELLOW
              
         pygame.draw.rect(screen, color, btn_rect, border_radius=10)
+        
+        # Visual indicator for selected (border)
+        if item["action"] == f"SET_FACE_FPS:{state.get('face_target_fps', 30)}":
+             pygame.draw.rect(screen, WHITE, btn_rect, width=3, border_radius=10)
         
         # Two-line text wrapping if too long
         label = item["label"]
@@ -2486,9 +2494,12 @@ def main():
                             state["menu_page"] = 0
                             state["mode"] = "MENU"
                         elif action.startswith("SET_FACE_FPS:"):
-                            state["face_target_fps"] = int(action.split(":")[1])
+                            fps_val = int(action.split(":")[1])
+                            print(f"⚙️ Setting Face FPS to: {fps_val}")
+                            state["face_target_fps"] = fps_val
                             save_config()
                             # Stay in menu to allow testing
+                            state["needs_redraw"] = True
                             pass
                         elif action == "SYSTEM:REBOOT":
                             screen.fill(BLACK)
