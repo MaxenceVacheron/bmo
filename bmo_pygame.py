@@ -576,18 +576,18 @@ def get_wifi_strength():
 def draw_advanced_stats(screen):
     screen.fill(GRAY)
     
-    title = FONT_MEDIUM.render("BMO SYSTEM STATUS", False, WHITE)
+    title = FONT_MEDIUM.render("BMO SYSTEM STATUS", True, WHITE)
     pygame.draw.rect(screen, BLACK, (0, 0, WIDTH, 50))
     screen.blit(title, (WIDTH//2 - title.get_width()//2, 10))
     
     y = 70
     ip = get_ip_address()
-    lbl = FONT_SMALL.render(f"IP: {ip}", False, BLACK)
+    lbl = FONT_SMALL.render(f"IP: {ip}", True, BLACK)
     screen.blit(lbl, (40, y))
     
     y += 40
     wifi = get_wifi_strength()
-    lbl = FONT_SMALL.render(f"WIFI SIGNAL: {wifi:.0f}%", False, BLACK)
+    lbl = FONT_SMALL.render(f"WIFI SIGNAL: {wifi:.0f}%", True, BLACK)
     screen.blit(lbl, (40, y))
     pygame.draw.rect(screen, BLACK, (40, y+30, 400, 20), 2)
     w = int(396 * (wifi / 100.0))
@@ -597,7 +597,7 @@ def draw_advanced_stats(screen):
     
     y += 70
     temp = get_cpu_temp()
-    lbl = FONT_SMALL.render(f"CPU TEMP: {temp:.1f}C", False, BLACK)
+    lbl = FONT_SMALL.render(f"CPU TEMP: {temp:.1f}C", True, BLACK)
     screen.blit(lbl, (40, y))
     pygame.draw.rect(screen, BLACK, (40, y+30, 400, 20), 2)
     w = int(396 * (min(temp, 85) / 85.0))
@@ -606,7 +606,7 @@ def draw_advanced_stats(screen):
     
     y += 70
     ram_p, ram_f = get_ram_usage()
-    lbl = FONT_SMALL.render(f"RAM: {ram_p:.1f}% ({ram_f:.1f} GB Free)", False, BLACK)
+    lbl = FONT_SMALL.render(f"RAM: {ram_p:.1f}% ({ram_f:.1f} GB Free)", True, BLACK)
     screen.blit(lbl, (40, y))
     pygame.draw.rect(screen, BLACK, (40, y+30, 400, 20), 2)
     w = int(396 * (ram_p / 100.0))
@@ -614,7 +614,7 @@ def draw_advanced_stats(screen):
     
     y += 70
     disk_p, disk_f = get_disk_usage()
-    lbl = FONT_SMALL.render(f"DISK: {disk_p:.1f}% ({disk_f:.1f} GB Free)", False, BLACK)
+    lbl = FONT_SMALL.render(f"DISK: {disk_p:.1f}% ({disk_f:.1f} GB Free)", True, BLACK)
     screen.blit(lbl, (40, y))
     pygame.draw.rect(screen, BLACK, (40, y+30, 400, 20), 2)
     w = int(396 * (disk_p / 100.0))
@@ -624,7 +624,7 @@ def auto_update_and_restart():
     """Pull latest changes from Git and restart the service"""
     print("🚀 BMO Auto-Update triggered!")
     screen.fill(BLACK)
-    lbl = FONT_MEDIUM.render("UPDATING BMO...", False, WHITE)
+    lbl = FONT_MEDIUM.render("UPDATING BMO...", True, WHITE)
     screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, HEIGHT//2 - 20))
     
     # Write to framebuffer directly for immediate feedback
@@ -694,7 +694,7 @@ def draw_weather(screen):
     
     # Header area (City)
     pygame.draw.rect(screen, BLACK, (0, 0, WIDTH, 40))
-    city_lbl = FONT_SMALL.render(state["weather"]["city"].upper(), False, WHITE)
+    city_lbl = FONT_SMALL.render(state["weather"]["city"].upper(), True, WHITE)
     screen.blit(city_lbl, (WIDTH//2 - city_lbl.get_width()//2, 10))
 
     # Icon
@@ -711,12 +711,12 @@ def draw_weather(screen):
             pass
             
     # Temp
-    temp_lbl = FONT_LARGE.render(state["weather"]["temp"], False, BLACK)
+    temp_lbl = FONT_LARGE.render(state["weather"]["temp"], True, BLACK)
     screen.blit(temp_lbl, (WIDTH//2 - temp_lbl.get_width()//2, 210))
     
     # Description
     desc = state["weather"]["desc"]
-    desc_lbl = FONT_SMALL.render(desc, False, BLACK)
+    desc_lbl = FONT_SMALL.render(desc, True, BLACK)
     screen.blit(desc_lbl, (WIDTH//2 - desc_lbl.get_width()//2, 275))
 
 # --- TOUCH INPUT THREAD ---
@@ -834,7 +834,7 @@ def update_slideshow():
 def draw_slideshow(screen):
     screen.fill(BLACK)
     if not state["slideshow"]["images"] or state["slideshow"]["images"][0] == "PLACEHOLDER_EMPTY":
-        txt = FONT_MEDIUM.render("No Images Found", False, WHITE)
+        txt = FONT_MEDIUM.render("No Images Found", True, WHITE)
         screen.blit(txt, (WIDTH//2 - txt.get_width()//2, HEIGHT//2))
         return
 
@@ -846,8 +846,8 @@ def draw_slideshow(screen):
     
     # Navigation hints (show for 1 second after touch)
     if time.time() - state["slideshow"]["last_touch_time"] < 1.0:
-        hint_left = FONT_SMALL.render("<", False, WHITE)
-        hint_right = FONT_SMALL.render(">", False, WHITE)
+        hint_left = FONT_SMALL.render("<", True, WHITE)
+        hint_right = FONT_SMALL.render(">", True, WHITE)
         screen.blit(hint_left, (10, HEIGHT - 30))
         screen.blit(hint_right, (WIDTH - 30, HEIGHT - 30))
 
@@ -1026,7 +1026,7 @@ def draw_gif(screen):
     
     frames = state["gif_player"]["frames"]
     if not frames:
-        txt = FONT_MEDIUM.render("No GIF loaded", False, WHITE)
+        txt = FONT_MEDIUM.render("No GIF loaded", True, WHITE)
         screen.blit(txt, (WIDTH//2 - txt.get_width()//2, HEIGHT//2))
         return
     
@@ -1037,8 +1037,8 @@ def draw_gif(screen):
     
     # Navigation hints (show for 1 second after touch)
     if time.time() - state["gif_player"]["last_touch_time"] < 1.0:
-        hint_left = FONT_SMALL.render("<", False, WHITE)
-        hint_right = FONT_SMALL.render(">", False, WHITE)
+        hint_left = FONT_SMALL.render("<", True, WHITE)
+        hint_right = FONT_SMALL.render(">", True, WHITE)
         screen.blit(hint_left, (10, HEIGHT - 30))
         screen.blit(hint_right, (WIDTH - 30, HEIGHT - 30))
 
@@ -1079,10 +1079,10 @@ def draw_text_viewer(screen):
     y = 20
     for line in state["text_viewer"]["content"]:
         if y > HEIGHT - 20: break
-        txt = FONT_SMALL.render(line, False, WHITE)
+        txt = FONT_SMALL.render(line, True, WHITE)
         screen.blit(txt, (20, y))
         y += 25
-    hint = FONT_SMALL.render("Tap to Close", False, GRAY)
+    hint = FONT_SMALL.render("Tap to Close", True, GRAY)
     screen.blit(hint, (WIDTH - hint.get_width() - 10, HEIGHT - 30))
 
 # --- STARTUP ANIMATION ---
@@ -1131,17 +1131,17 @@ def draw_startup(screen):
     y = HEIGHT // 2 - (len(lines) * 30) // 2
     for l in lines:
         if l.strip():
-            surf = FONT_MEDIUM.render(l, False, WHITE) # WHITE text on BLACK
+            surf = FONT_MEDIUM.render(l, True, WHITE) # WHITE text on BLACK
             screen.blit(surf, (WIDTH//2 - surf.get_width()//2, y))
         y += 30
     
     # Blinking cursor
     if state["startup"]["char_index"] < len(message):
         if int(time.time() * 2) % 2 == 0:  # Blink every 0.5s
-            cursor = FONT_MEDIUM.render("_", False, WHITE)
+            cursor = FONT_MEDIUM.render("_", True, WHITE)
             # Position cursor at end of last line
             last_line_content = lines[-1] if lines else ""
-            last_line_surf = FONT_MEDIUM.render(last_line_content, False, WHITE)
+            last_line_surf = FONT_MEDIUM.render(last_line_content, True, WHITE)
             cursor_x = WIDTH//2 - last_line_surf.get_width()//2 + last_line_surf.get_width()
             cursor_y = y - 30
             screen.blit(cursor, (cursor_x, cursor_y))
@@ -1253,10 +1253,10 @@ def draw_focus_face(screen):
         pygame.draw.rect(screen, TEAL, (200, 160, 80, 40)) # Cut top half
         
         # Text
-        txt = FONT_MEDIUM.render("GOOD JOB!", False, BLACK)
+        txt = FONT_MEDIUM.render("GOOD JOB!", True, BLACK)
         screen.blit(txt, (WIDTH//2 - txt.get_width()//2, 50))
         
-        hint = FONT_SMALL.render("Tap to finish", False, BLACK)
+        hint = FONT_SMALL.render("Tap to finish", True, BLACK)
         screen.blit(hint, (WIDTH//2 - hint.get_width()//2, 280))
         
         return
@@ -1283,7 +1283,7 @@ def draw_focus_face(screen):
     secs = int(remaining % 60)
     timer_txt = f"{mins:02d}:{secs:02d}"
     
-    txt = FONT_MEDIUM.render(timer_txt, False, BLACK)
+    txt = FONT_MEDIUM.render(timer_txt, True, BLACK)
     # Background for timer text for readability
     # pygame.draw.rect(screen, WHITE, (WIDTH//2 - 50, 250, 100, 40))
     screen.blit(txt, (WIDTH//2 - txt.get_width()//2, 260))
@@ -1515,11 +1515,11 @@ def draw_face(screen):
             bar_w = int(76 * (val/100.0))
             pygame.draw.rect(screen, WHITE, (rect[0]+2, rect[1]+30, bar_w, 6))
             # Text
-            txt = FONT_TINY.render(label, False, WHITE)
+            txt = FONT_TINY.render(label, True, WHITE)
             screen.blit(txt, (rect[0] + (rect[2]-txt.get_width())//2, rect[1]+5))
 
         # Close instruction
-        instr = FONT_TINY.render("Tap center to hide", False, WHITE)
+        instr = FONT_TINY.render("Tap center to hide", True, WHITE)
         screen.blit(instr, (WIDTH//2 - instr.get_width()//2, 290))
 
     # 4. Floating Hearts
@@ -1539,7 +1539,7 @@ def draw_face(screen):
         timer_txt = f"{mins:02d}:{secs:02d}"
         
         # Text with background for readability
-        txt = FONT_MEDIUM.render(timer_txt, False, WHITE)
+        txt = FONT_MEDIUM.render(timer_txt, True, WHITE)
         bg_rect = (WIDTH//2 - txt.get_width()//2 - 10, HEIGHT - 50, txt.get_width() + 20, 30)
         pygame.draw.rect(screen, (0,0,0,180), bg_rect, border_radius=5)
         screen.blit(txt, (WIDTH//2 - txt.get_width()//2, HEIGHT - 48))
@@ -1558,17 +1558,17 @@ def draw_face(screen):
             overlay.fill((0, 0, 0, 200))
             screen.blit(overlay, (0,0))
             
-            lbl = FONT_MEDIUM.render("Stop Focus?", False, WHITE)
+            lbl = FONT_MEDIUM.render("Stop Focus?", True, WHITE)
             screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, 80))
             
             # YES Button (Red)
             pygame.draw.rect(screen, RED, (60, 160, 140, 60), border_radius=10)
-            lbl_yes = FONT_MEDIUM.render("YES", False, WHITE)
+            lbl_yes = FONT_MEDIUM.render("YES", True, WHITE)
             screen.blit(lbl_yes, (130 - lbl_yes.get_width()//2, 190 - lbl_yes.get_height()//2))
             
             # NO Button (Green)
             pygame.draw.rect(screen, GREEN, (280, 160, 140, 60), border_radius=10)
-            lbl_no = FONT_MEDIUM.render("NO", False, WHITE)
+            lbl_no = FONT_MEDIUM.render("NO", True, WHITE)
             screen.blit(lbl_no, (350 - lbl_no.get_width()//2, 190 - lbl_no.get_height()//2))
 
 def draw_click_crosshair(screen):
@@ -1591,7 +1591,7 @@ def draw_click_crosshair(screen):
     # Draw Message Notification if on Face
     if state["mode"] == "FACE" and state["messages"]["unread"]:
         pygame.draw.circle(screen, RED, (WIDTH - 30, HEIGHT - 30), 12)
-        txt = FONT_TINY.render("!", False, WHITE)
+        txt = FONT_TINY.render("!", True, WHITE)
         screen.blit(txt, (WIDTH - 30 - txt.get_width()//2, HEIGHT - 30 - txt.get_height()//2))
 
 def draw_menu(screen):
@@ -1605,7 +1605,7 @@ def draw_menu(screen):
     title_font = FONT_SMALL if is_submenu else FONT_MEDIUM
     
     pygame.draw.rect(screen, BLACK, (0, 0, WIDTH, banner_height))
-    title = title_font.render(f"BMO MENU: {current_menu_id}", False, WHITE)
+    title = title_font.render(f"BMO MENU: {current_menu_id}", True, WHITE)
     screen.blit(title, (WIDTH//2 - title.get_width()//2, (banner_height - title.get_height())//2))
     
     # Pagination Logic (2x2 Grid = 4 items per page)
@@ -1648,12 +1648,12 @@ def draw_menu(screen):
         if " " in label and FONT_SMALL.size(label)[0] > btn_w - 10:
             words = label.split(" ")
             mid = len(words) // 2
-            l1 = FONT_TINY.render(" ".join(words[:mid]), False, BLACK)
-            l2 = FONT_TINY.render(" ".join(words[mid:]), False, BLACK)
+            l1 = FONT_TINY.render(" ".join(words[:mid]), True, BLACK)
+            l2 = FONT_TINY.render(" ".join(words[mid:]), True, BLACK)
             screen.blit(l1, (bx + (btn_w - l1.get_width())//2, by + 15))
             screen.blit(l2, (bx + (btn_w - l2.get_width())//2, by + 40))
         else:
-            lbl = FONT_SMALL.render(label, False, BLACK)
+            lbl = FONT_SMALL.render(label, True, BLACK)
             screen.blit(lbl, (bx + (btn_w - lbl.get_width())//2, by + (btn_h - lbl.get_height())//2))
 
     # Draw Navigation Buttons (Centered at Bottom)
@@ -1664,14 +1664,14 @@ def draw_menu(screen):
         # PREV Button
         prev_rect = (start_x, nav_y, btn_w, nav_h)
         pygame.draw.rect(screen, GRAY, prev_rect, border_radius=5)
-        lbl = FONT_SMALL.render("< PREV", False, BLACK)
+        lbl = FONT_SMALL.render("< PREV", True, BLACK)
         screen.blit(lbl, (prev_rect[0] + (btn_w - lbl.get_width())//2, nav_y + 10))
         
     if page < total_pages - 1:
         # NEXT Button
         next_rect = (start_x + btn_w + gap, nav_y, btn_w, nav_h)
         pygame.draw.rect(screen, GRAY, next_rect, border_radius=5)
-        lbl = FONT_SMALL.render("NEXT >", False, BLACK)
+        lbl = FONT_SMALL.render("NEXT >", True, BLACK)
         screen.blit(lbl, (next_rect[0] + (btn_w - lbl.get_width())//2, nav_y + 10))
 
 def draw_stats(screen):
@@ -1679,13 +1679,13 @@ def draw_stats(screen):
     temp = get_cpu_temp()
     ram = get_ram_usage()
     y = 40
-    lbl = FONT_MEDIUM.render(f"CPU: {temp:.1f}C", False, BLACK)
+    lbl = FONT_MEDIUM.render(f"CPU: {temp:.1f}C", True, BLACK)
     screen.blit(lbl, (40, y))
     pygame.draw.rect(screen, BLACK, (40, y+40, 400, 30), 2)
     w = int(396 * (temp / 85.0))
     pygame.draw.rect(screen, RED if temp > 60 else GREEN, (42, y+42, w, 26))
     y += 100
-    lbl = FONT_MEDIUM.render(f"RAM: {ram:.1f}%", False, BLACK)
+    lbl = FONT_MEDIUM.render(f"RAM: {ram:.1f}%", True, BLACK)
     screen.blit(lbl, (40, y))
     pygame.draw.rect(screen, BLACK, (40, y+40, 400, 30), 2)
     w = int(396 * (ram / 100.0))
@@ -1695,8 +1695,8 @@ def draw_clock(screen):
     screen.fill(BLUE)
     t = time.strftime("%H:%M:%S")
     d = time.strftime("%A, %b %d")
-    lbl_t = FONT_LARGE.render(t, False, WHITE)
-    lbl_d = FONT_MEDIUM.render(d, False, WHITE)
+    lbl_t = FONT_LARGE.render(t, True, WHITE)
+    lbl_d = FONT_MEDIUM.render(d, True, WHITE)
     screen.blit(lbl_t, (WIDTH//2 - lbl_t.get_width()//2, 100))
     screen.blit(lbl_d, (WIDTH//2 - lbl_d.get_width()//2, 180))
 
@@ -1715,14 +1715,14 @@ def draw_notes(screen):
     lines.append(' '.join(line))
     y = 100
     for l in lines:
-        surf = FONT_MEDIUM.render(l, False, WHITE)
+        surf = FONT_MEDIUM.render(l, True, WHITE)
         screen.blit(surf, (WIDTH//2 - surf.get_width()//2, y))
         # y += 40
 
 def draw_messages_menu(screen):
     screen.fill(PINK)
     pygame.draw.rect(screen, BLACK, (0, 0, WIDTH, 50))
-    title = FONT_MEDIUM.render("BMO INBOX", False, WHITE)
+    title = FONT_MEDIUM.render("BMO INBOX", True, WHITE)
     screen.blit(title, (WIDTH//2 - title.get_width()//2, 10))
     
     all_msgs = state["messages"]["list"]
@@ -1730,7 +1730,7 @@ def draw_messages_menu(screen):
     msgs = [m for m in all_msgs if m.get("sender") != "BMO"]
     
     if not msgs:
-        lbl = FONT_SMALL.render("No messages yet!", False, BLACK)
+        lbl = FONT_SMALL.render("No messages yet!", True, BLACK)
         screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, HEIGHT//2))
     else:
         # Pagination for messages
@@ -1754,9 +1754,9 @@ def draw_messages_menu(screen):
             ts = m.get("timestamp", 0)
             formatted_time = time.strftime("%d/%m %H:%M", time.localtime(ts)) if ts else ""
             
-            lbl_s = FONT_TINY.render(f"From: {sender}", False, BLACK)
-            lbl_t = FONT_TINY.render(formatted_time, False, GRAY)
-            lbl_c = FONT_SMALL.render(content, False, BLACK)
+            lbl_s = FONT_TINY.render(f"From: {sender}", True, BLACK)
+            lbl_t = FONT_TINY.render(formatted_time, True, GRAY)
+            lbl_c = FONT_SMALL.render(content, True, BLACK)
             screen.blit(lbl_s, (40, y + 5))
             screen.blit(lbl_t, (WIDTH - 40 - lbl_t.get_width(), y + 5))
             screen.blit(lbl_c, (40, y + 22))
@@ -1768,20 +1768,20 @@ def draw_messages_menu(screen):
         # Draw Nav
         nav_y = 280
         if page > 0:
-            lbl = FONT_TINY.render("< PREV", False, BLACK)
+            lbl = FONT_TINY.render("< PREV", True, BLACK)
             screen.blit(lbl, (20, nav_y))
         if len(msgs) > (page + 1) * items_per_page:
-            lbl = FONT_TINY.render("NEXT >", False, BLACK)
+            lbl = FONT_TINY.render("NEXT >", True, BLACK)
             screen.blit(lbl, (WIDTH - 80, nav_y))
             
     # Exit Button (Fixed position)
     pygame.draw.rect(screen, GRAY, (WIDTH//2 - 40, 280, 80, 30), border_radius=5)
-    lbl = FONT_TINY.render("EXIT", False, WHITE)
+    lbl = FONT_TINY.render("EXIT", True, WHITE)
     screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, 287))
     
     # Fetch Button (Right side)
     pygame.draw.rect(screen, BLUE, (WIDTH - 90, 10, 80, 30), border_radius=5)
-    lbl = FONT_TINY.render("FETCH", False, WHITE)
+    lbl = FONT_TINY.render("FETCH", True, WHITE)
     screen.blit(lbl, (WIDTH - 50 - lbl.get_width()//2, 17))
 
 def draw_message_view(screen):
@@ -1803,11 +1803,11 @@ def draw_message_view(screen):
     formatted_date = time.strftime("%d/%m %H:%M", time.localtime(ts)) if ts else ""
     
     # Sender
-    lbl_s = FONT_SMALL.render(sender, False, BLACK)
+    lbl_s = FONT_SMALL.render(sender, True, BLACK)
     screen.blit(lbl_s, (20, 10))
     
     # Date
-    date_surf = FONT_TINY.render(formatted_date, False, GRAY)
+    date_surf = FONT_TINY.render(formatted_date, True, GRAY)
     screen.blit(date_surf, (WIDTH - 20 - date_surf.get_width(), 15)) # Align baseline roughly
     
     # Typewriter Effect
@@ -1848,24 +1848,24 @@ def draw_message_view(screen):
     start_y = (HEIGHT - total_h) // 2
     
     for i, l in enumerate(lines):
-        surf = current_font.render(l, False, BLACK)
+        surf = current_font.render(l, True, BLACK)
         # Center horizontally
         x = (WIDTH - surf.get_width()) // 2
         screen.blit(surf, (x, start_y + i * line_h))
     
     # Sender was moved to top
     # sender = msg.get("sender", "Unknown")
-    # sig = FONT_TINY.render(f"- {sender}", False, GRAY)
+    # sig = FONT_TINY.render(f"- {sender}", True, GRAY)
     # screen.blit(sig, (WIDTH - 30 - sig.get_width(), HEIGHT - 30))
     
     # Subtle Back interaction hint (no big buttons)
-    hint = FONT_TINY.render("< TAP TO CLOSE", False, (200, 200, 200))
+    hint = FONT_TINY.render("< TAP TO CLOSE", True, (200, 200, 200))
     screen.blit(hint, (20, HEIGHT - 30))
         
     # REPLY Button - ONLY for AMO
     if sender == "AMO":
         pygame.draw.rect(screen, TEAL, (WIDTH - 100, HEIGHT - 40, 80, 30), border_radius=5)
-        lbl = FONT_TINY.render("REPLY", False, WHITE)
+        lbl = FONT_TINY.render("REPLY", True, WHITE)
         screen.blit(lbl, (WIDTH - 60 - lbl.get_width()//2, HEIGHT - 33))
         
 
@@ -1913,10 +1913,10 @@ def draw_focus_face(screen):
         pygame.draw.rect(screen, TEAL, (200, 160, 80, 40)) # Cut top half
         
         # Text
-        txt = FONT_MEDIUM.render("GOOD JOB!", False, BLACK)
+        txt = FONT_MEDIUM.render("GOOD JOB!", True, BLACK)
         screen.blit(txt, (WIDTH//2 - txt.get_width()//2, 50))
         
-        hint = FONT_SMALL.render("Tap to finish", False, BLACK)
+        hint = FONT_SMALL.render("Tap to finish", True, BLACK)
         screen.blit(hint, (WIDTH//2 - hint.get_width()//2, 280))
         
         return
@@ -1943,7 +1943,7 @@ def draw_focus_face(screen):
     secs = int(remaining % 60)
     timer_txt = f"{mins:02d}:{secs:02d}"
     
-    txt = FONT_MEDIUM.render(timer_txt, False, BLACK)
+    txt = FONT_MEDIUM.render(timer_txt, True, BLACK)
     # Background for timer text for readability
     # pygame.draw.rect(screen, WHITE, (WIDTH//2 - 50, 250, 100, 40))
     screen.blit(txt, (WIDTH//2 - txt.get_width()//2, 260))
@@ -2072,12 +2072,12 @@ def draw_compose(screen):
     
     # Header
     pygame.draw.rect(screen, TEAL, (0,0, WIDTH, 40))
-    title = FONT_SMALL.render("COMPOSING...", False, BLACK)
+    title = FONT_SMALL.render("COMPOSING...", True, BLACK)
     screen.blit(title, (WIDTH//2 - title.get_width()//2, 10))
     
     # Close Button
     pygame.draw.rect(screen, RED, (WIDTH-40, 5, 30, 30), border_radius=5)
-    lbl = FONT_TINY.render("X", False, WHITE)
+    lbl = FONT_TINY.render("X", True, WHITE)
     screen.blit(lbl, (WIDTH-25-lbl.get_width()//2, 12))
 
     # Text Area
@@ -2091,11 +2091,11 @@ def draw_compose(screen):
         line.append(w)
         if FONT_MEDIUM.size(' '.join(line))[0] > WIDTH - 20:
             line.pop()
-            txt = FONT_MEDIUM.render(' '.join(line), False, BLACK)
+            txt = FONT_MEDIUM.render(' '.join(line), True, BLACK)
             screen.blit(txt, (10, y))
             y += 35
             line = [w]
-    txt = FONT_MEDIUM.render(' '.join(line), False, BLACK)
+    txt = FONT_MEDIUM.render(' '.join(line), True, BLACK)
     screen.blit(txt, (10, y))
     
     # 3. Candidates Bar (Now acting as a "current word" or "next" hint)
@@ -2112,7 +2112,7 @@ def draw_compose(screen):
                     hint_text += f"[{c}] "
                 else:
                     hint_text += f"{c} "
-            lbl = FONT_SMALL.render(hint_text.strip(), False, WHITE)
+            lbl = FONT_SMALL.render(hint_text.strip(), True, WHITE)
             screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, bar_y + 10))
     
     # 4. Keypad
@@ -2140,10 +2140,10 @@ def draw_compose(screen):
         pygame.draw.rect(screen, color, (bx, by, col_w, row_h))
         pygame.draw.rect(screen, GRAY, (bx, by, col_w, row_h), 1)
         
-        l1 = FONT_MEDIUM.render(main_char, False, BLACK)
+        l1 = FONT_MEDIUM.render(main_char, True, BLACK)
         screen.blit(l1, (bx + col_w//2 - l1.get_width()//2, by + 5))
         
-        l2 = FONT_TINY.render(sub, False, GRAY if color == WHITE else WHITE)
+        l2 = FONT_TINY.render(sub, True, GRAY if color == WHITE else WHITE)
         screen.blit(l2, (bx + col_w//2 - l2.get_width()//2, by + 35))
 
 def main():
@@ -2410,7 +2410,7 @@ def main():
                             state["mode"] = "MENU"
                         elif action == "SYSTEM:REBOOT":
                             screen.fill(BLACK)
-                            lbl = FONT_MEDIUM.render("REBOOTING...", False, RED)
+                            lbl = FONT_MEDIUM.render("REBOOTING...", True, RED)
                             screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, HEIGHT//2))
                             # Force write to framebuffer
                             try:
