@@ -2381,7 +2381,10 @@ def main():
                             if state["menu_page"] < total_pages - 1: state["menu_page"] += 1
                                 
                     if clicked_item_idx != -1:
-                        action = items[clicked_item_idx]["action"]
+                        item = items[clicked_item_idx]
+                        action = item["action"]
+                        label = item["label"]
+                        print(f"🔘 Menu Click: [ {label} ] -> Action: {action} (page {state['menu_page']})")
                         if action == "BACK":
                             state["menu_stack"].pop()
                             state["menu_page"] = 0 # Reset page when going back
@@ -2461,9 +2464,11 @@ def main():
                     # But if Timer Ended: Return to Face
                     remaining = state["focus"]["end_time"] - time.time()
                     if remaining <= 0:
+                        print("🔘 Focus Click: Timer ended -> Return to Face")
                         switch_to_face_mode()
                     else:
                         # CENTER: Exit to menu (Restore State)
+                        print("🔘 Focus Click: Manual Exit -> Return to Menu")
                         state["mode"] = "MENU"
                         if state["saved_menu_stack"]:
                             state["menu_stack"] = list(state["saved_menu_stack"])
@@ -2483,6 +2488,7 @@ def main():
                     
                     if x < WIDTH / 3:
                         # LEFT: Previous
+                        print(f"🔘 {state['mode']} Click: PREVIOUS")
                         if state["mode"] == "SLIDESHOW":
                             imgs = state["slideshow"]["images"]
                             if imgs and imgs[0] != "PLACEHOLDER_EMPTY":
@@ -2498,6 +2504,7 @@ def main():
                     
                     elif x > 2 * WIDTH / 3:
                         # RIGHT: Next
+                        print(f"🔘 {state['mode']} Click: NEXT")
                         if state["mode"] == "SLIDESHOW":
                             state["slideshow"]["last_switch"] = 0  # Force immediate switch
                         elif state["mode"] == "GIF_PLAYER":
@@ -2509,6 +2516,7 @@ def main():
                     
                     else:
                         # CENTER: Exit to menu (Restore State)
+                        print(f"🔘 {state['mode']} Click: EXIT")
                         state["mode"] = "MENU"
                         if state["saved_menu_stack"]:
                             state["menu_stack"] = list(state["saved_menu_stack"])
@@ -2521,15 +2529,20 @@ def main():
                     # Exit
                     if y > 260:
                         if WIDTH / 2 - 40 < x < WIDTH / 2 + 40:
+                            print("🔘 Messages Click: EXIT")
                             state["mode"] = "MENU"
-                        elif x < 100 and state["menu_page"] > 0: state["menu_page"] -= 1
+                        elif x < 100 and state["menu_page"] > 0:
+                            print("🔘 Messages Click: PREV PAGE")
+                            state["menu_page"] -= 1
                         elif x > WIDTH - 100:
                             # Use filtered list for pagination check
                             filtered_msgs = [m for m in state["messages"]["list"] if m.get("sender") != "BMO"]
                             if len(filtered_msgs) > (state["menu_page"] + 1) * 4:
+                                print("🔘 Messages Click: NEXT PAGE")
                                 state["menu_page"] += 1
                     # Manual Fetch
                     elif 0 <= y <= 50 and x > WIDTH - 100:
+                        print("🔘 Messages Click: SYNC TRIGGER")
                         threading.Thread(target=sync_messages, daemon=True).start()
                     # Message Selection
                     elif 60 <= y < 280:
@@ -2541,6 +2554,7 @@ def main():
                         if real_idx < len(filtered_msgs):
                             msg = filtered_msgs[real_idx]
                             msg_id = msg["id"]
+                            print(f"🔘 Messages Click: View Message {msg_id} from {msg.get('sender')}")
                             state["messages"]["viewing_id"] = msg_id
                             
                             # Mark as read locally
@@ -2567,6 +2581,7 @@ def main():
                     sender = msg.get("sender", "Unknown") if msg else "Unknown"
 
                     if sender == "AMO" and x > WIDTH - 100 and y > HEIGHT - 40:
+                        print(f"🔘 Message View Click: REPLY to {sender}")
                         state["mode"] = "COMPOSE"
                         state["compose"]["text"] = ""
                         state["compose"]["buffer"] = ""
@@ -2575,14 +2590,17 @@ def main():
                         state["needs_redraw"] = True
                     else:
                         # All other clicks return to inbox (Back)
+                        print("🔘 Message View Click: BACK to Inbox")
                         state["mode"] = "MESSAGES"
                 
                 elif state["mode"] == "COMPOSE":
+                    print(f"🔘 Compose Click at ({x}, {y})")
                     handle_compose_touch((x, y))
                 
                 elif state["mode"] == "SNAKE":
                     if state["snake"]:
                         if state["snake"].game_over:
+                            print("🔘 Snake Click: Game Over -> Return to Menu")
                             state["mode"] = "MENU"
                             if state["saved_menu_stack"]:
                                 state["menu_stack"] = list(state["saved_menu_stack"])
@@ -2591,9 +2609,11 @@ def main():
                                 state["menu_stack"] = ["MAIN"]
                                 state["menu_page"] = 0
                         else:
+                            print(f"🔘 Snake Click: Screen Input at ({x}, {y})")
                             state["snake"].handle_input((x, y))
                 
                 else: 
+                    print(f"🔘 General Click: Mode was {state['mode']} at ({x}, {y}) -> Switching to MENU")
                     state["mode"] = "MENU"
         
         # --- UPDATE PHASE ---
