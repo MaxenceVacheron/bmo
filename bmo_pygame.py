@@ -29,7 +29,7 @@ READ_RECEIPT_URL = "https://bmo.pg.maxencevacheron.fr/read"
 
 def load_config():
     """Load configuration from file"""
-    defaults = {"brightness": 1.0, "default_mode": "FACE", "power_save": False}
+    defaults = {"brightness": 1.0, "default_mode": "FACE", "power_save": False, "face_target_fps": 30}
     if os.path.exists(CONFIG_FILE):
         try:
             with open(CONFIG_FILE, 'r') as f:
@@ -44,7 +44,8 @@ def save_config():
     config = {
         "brightness": state.get("brightness", 1.0),
         "default_mode": state.get("default_mode", "FACE"),
-        "power_save": state.get("power_save", False)
+        "power_save": state.get("power_save", False),
+        "face_target_fps": state.get("face_target_fps", 30)
     }
     try:
         with open(CONFIG_FILE, 'w') as f:
@@ -162,9 +163,26 @@ MENUS = {
     "SETTINGS": [
         {"label": "BRIGHTNESS", "action": "MENU:BRIGHTNESS", "color": TEAL},
         {"label": "POWER MGMT", "action": "MENU:POWER", "color": ORANGE},
+        {"label": "FACE FPS", "action": "MENU:FACE_FPS", "color": PINK},
         {"label": "BOOT MODE", "action": "MENU:DEFAULT_MODE", "color": BLUE},
         {"label": "REBOOT", "action": "SYSTEM:REBOOT", "color": RED},
         {"label": "< BACK", "action": "BACK", "color": GRAY},
+    ],
+    "FACE_FPS": [
+        {"label": "1 FPS", "action": "SET_FACE_FPS:1", "color": BLUE},
+        {"label": "2 FPS", "action": "SET_FACE_FPS:2", "color": BLUE},
+        {"label": "3 FPS", "action": "SET_FACE_FPS:3", "color": BLUE},
+        {"label": "4 FPS", "action": "SET_FACE_FPS:4", "color": BLUE},
+        {"label": "5 FPS", "action": "SET_FACE_FPS:5", "color": BLUE},
+        {"label": "6 FPS", "action": "SET_FACE_FPS:6", "color": BLUE},
+        {"label": "7 FPS", "action": "SET_FACE_FPS:7", "color": BLUE},
+        {"label": "8 FPS", "action": "SET_FACE_FPS:8", "color": BLUE},
+        {"label": "9 FPS", "action": "SET_FACE_FPS:9", "color": BLUE},
+        {"label": "10 FPS", "action": "SET_FACE_FPS:10", "color": TEAL},
+        {"label": "15 FPS", "action": "SET_FACE_FPS:15", "color": TEAL},
+        {"label": "30 FPS", "action": "SET_FACE_FPS:30", "color": GREEN},
+        {"label": "60 FPS", "action": "SET_FACE_FPS:60", "color": YELLOW},
+        {"label": "< BACK", "action": "BACK", "color": RED},
     ],
     "BRIGHTNESS": [
         {"label": "25%", "action": "BRIGHTNESS:0.25", "color": TEAL},
@@ -234,6 +252,7 @@ state = {
     "menu_page": 0,
     "brightness": 1.0,
     "default_mode": "FACE",
+    "face_target_fps": 30,
     "blink_timer": 0, # Time until next blink
     "is_blinking": False,
     "blink_end_time": 0,
@@ -619,6 +638,11 @@ def draw_advanced_stats(screen):
     pygame.draw.rect(screen, BLACK, (40, y+30, 400, 20), 2)
     w = int(396 * (disk_p / 100.0))
     pygame.draw.rect(screen, BLUE, (42, y+32, w, 16))
+
+    y += 70
+    fps_val = state.get("face_target_fps", 30)
+    lbl = FONT_SMALL.render(f"FACE FPS TARGET: {fps_val}", True, BLACK)
+    screen.blit(lbl, (40, y))
 
 def auto_update_and_restart():
     """Pull latest changes from Git and restart the service"""
@@ -2160,6 +2184,7 @@ def main():
     state["brightness"] = config.get("brightness", 1.0)
     state["default_mode"] = config.get("default_mode", "FACE")
     state["power_save"] = config.get("power_save", False)
+    state["face_target_fps"] = config.get("face_target_fps", 30)
 
     # Load messages
     load_messages()
@@ -2408,6 +2433,11 @@ def main():
                                 state["menu_stack"].pop()
                             state["menu_page"] = 0
                             state["mode"] = "MENU"
+                        elif action.startswith("SET_FACE_FPS:"):
+                            state["face_target_fps"] = int(action.split(":")[1])
+                            save_config()
+                            # Stay in menu to allow testing
+                            pass
                         elif action == "SYSTEM:REBOOT":
                             screen.fill(BLACK)
                             lbl = FONT_MEDIUM.render("REBOOTING...", True, RED)
@@ -2656,10 +2686,13 @@ def main():
                 sys.stdout.flush()
                 sys.exit(1)
             
-        # FPS Control: Slow down to 5 FPS in FACE mode if Power Save is ON
+        # FPS Control
         current_fps = 30
-        if state["power_save"] and state["mode"] == "FACE":
-            current_fps = 5
+        if state["mode"] == "FACE":
+            if state["power_save"]:
+                current_fps = 5
+            else:
+                current_fps = state.get("face_target_fps", 30)
         
         # Auto-Dimming in Power Save Mode
         if state["power_save"] and now - state["last_interaction"] > 120: # 2 minutes
