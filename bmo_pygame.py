@@ -353,7 +353,9 @@ state = {
         "unread": False,
         "selected_index": 0,
         "viewing_id": None,
-        "view_start_time": 0
+        "view_start_time": 0,
+        "deleted_ids": [],
+        "show_confirm_delete": False
     },
     "compose": {
         "text": "",
@@ -377,6 +379,10 @@ def load_messages():
             with open(MESSAGES_FILE, 'r') as f:
                 data = json.load(f)
                 state["messages"]["list"] = data.get("messages", [])
+                state["messages"]["deleted_ids"] = data.get("deleted_ids", [])
+                
+                # Filter out deleted if they somehow ended up in state list
+                state["messages"]["list"] = [m for m in state["messages"]["list"] if m["id"] not in state["messages"]["deleted_ids"]]
                 
                 # Check for unread
                 any_unread = False
@@ -418,7 +424,10 @@ def save_messages():
     """Save messages to local storage"""
     try:
         with open(MESSAGES_FILE, 'w') as f:
-            json.dump({"messages": state["messages"]["list"]}, f)
+            json.dump({
+                "messages": state["messages"]["list"],
+                "deleted_ids": state["messages"]["deleted_ids"]
+            }, f)
     except Exception as e:
         print(f"Error saving messages: {e}")
 
@@ -440,10 +449,11 @@ def sync_messages():
                 new_msgs = data.get("messages", [])
                 
                 existing_ids = {m["id"] for m in state["messages"]["list"]}
+                deleted_ids = set(state["messages"]["deleted_ids"])
                 added = False
                 new_incoming = False
                 for m in new_msgs:
-                    if m["id"] not in existing_ids:
+                    if m["id"] not in existing_ids and m["id"] not in deleted_ids:
                         state["messages"]["list"].append(m)
                         if not m.get("read", False):
                             state["messages"]["unread"] = True
@@ -1891,6 +1901,43 @@ def draw_message_view(screen):
         pygame.draw.rect(screen, TEAL, (WIDTH - 100, HEIGHT - 40, 80, 30), border_radius=5)
         lbl = FONT_TINY.render("REPLY", True, WHITE)
         screen.blit(lbl, (WIDTH - 60 - lbl.get_width()//2, HEIGHT - 33))
+
+    # DELETE Button (Trash Icon Placeholder)
+    pygame.draw.rect(screen, (240, 240, 240), (20, HEIGHT - 45, 40, 40), border_radius=5)
+    # Simple trash icon drawing using lines
+    pygame.draw.rect(screen, RED, (28, HEIGHT - 35, 24, 20), 2) # Body
+    pygame.draw.line(screen, RED, (25, HEIGHT - 38), (55, HEIGHT - 38), 2) # Lid
+    pygame.draw.line(screen, RED, (35, HEIGHT - 41), (45, HEIGHT - 41), 2) # Handle
+
+    # Overlay Confirmation
+    if state["messages"]["show_confirm_delete"]:
+        draw_delete_confirmation(screen)
+
+def draw_delete_confirmation(screen):
+    """Draw a semi-transparent overlay to confirm deletion"""
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 180)) # Darker translucent
+    screen.blit(overlay, (0, 0))
+    
+    # Dialog Box
+    dialog_w, dialog_h = 300, 150
+    dx = (WIDTH - dialog_w) // 2
+    dy = (HEIGHT - dialog_h) // 2
+    pygame.draw.rect(screen, WHITE, (dx, dy, dialog_w, dialog_h), border_radius=15)
+    
+    # Text
+    txt = FONT_SMALL.render("Delete Message?", True, BLACK)
+    screen.blit(txt, (WIDTH//2 - txt.get_width()//2, dy + 30))
+    
+    # YES Button
+    pygame.draw.rect(screen, RED, (dx + 30, dy + 80, 110, 45), border_radius=8)
+    lbl_y = FONT_SMALL.render("YES", True, WHITE)
+    screen.blit(lbl_y, (dx + 85 - lbl_y.get_width()//2, dy + 92))
+    
+    # NO Button
+    pygame.draw.rect(screen, GRAY, (dx + 160, dy + 80, 110, 45), border_radius=8)
+    lbl_n = FONT_SMALL.render("NO", True, WHITE)
+    screen.blit(lbl_n, (dx + 215 - lbl_n.get_width()//2, dy + 92))
         
 
 
@@ -2575,12 +2622,40 @@ def main():
                             threading.Thread(target=send_read_receipt, args=(msg_id,), daemon=True).start()
                 
                 elif state["mode"] == "MESSAGE_VIEW":
-                    # Check Reply Button
+                    # Check if confirmation is showing
+                    if state["messages"]["show_confirm_delete"]:
+                        # YES Button
+                        dx = (WIDTH - 300) // 2
+                        dy = (HEIGHT - 150) // 2
+                        if dx + 30 < x < dx + 140 and dy + 80 < y < dy + 125:
+                            print(f"🔘 Message View Click: CONFIRM DELETE {msg_id}")
+                            # Delete Logic
+                            state["messages"]["deleted_ids"].append(msg_id)
+                            # Remove from local list
+                            state["messages"]["list"] = [m for m in state["messages"]["list"] if m["id"] != msg_id]
+                            save_messages()
+                            state["messages"]["show_confirm_delete"] = False
+                            state["mode"] = "MESSAGES"
+                        # NO Button
+                        elif dx + 160 < x < dx + 270 and dy + 80 < y < dy + 125:
+                            print("🔘 Message View Click: CANCEL DELETE")
+                            state["messages"]["show_confirm_delete"] = False
+                        
+                        state["needs_redraw"] = True
+                        continue # Skip standard view logic
+
+                    # Standard Message View Logic
                     msg_id = state["messages"]["viewing_id"]
                     msg = next((m for m in state["messages"]["list"] if m["id"] == msg_id), None)
                     sender = msg.get("sender", "Unknown") if msg else "Unknown"
 
-                    if sender == "AMO" and x > WIDTH - 100 and y > HEIGHT - 40:
+                    # Check Trash Icon (Bottom Left)
+                    if 20 < x < 60 and HEIGHT - 45 < y < HEIGHT - 5:
+                        print(f"🔘 Message View Click: TRASH ICON for {msg_id}")
+                        state["messages"]["show_confirm_delete"] = True
+                        state["needs_redraw"] = True
+                    # Check Reply Button
+                    elif sender == "AMO" and x > WIDTH - 100 and y > HEIGHT - 40:
                         print(f"🔘 Message View Click: REPLY to {sender}")
                         state["mode"] = "COMPOSE"
                         state["compose"]["text"] = ""
