@@ -30,4 +30,12 @@ echo "📡 Disabling Bluetooth..."
 sudo systemctl stop bluetooth.service || true
 sudo systemctl disable bluetooth.service || true
 
+# 4. Set CPU Governor to powersave (Max energy saving)
+echo "⚡ Setting CPU Governor to powersave..."
+echo powersave | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor > /dev/null
+
+# 5. Turn off HDMI power
+echo "🔌 Disabling HDMI output..."
+sudo vcgencmd display_power 0 || true
+
 echo "✅ Power Save Mode Active."

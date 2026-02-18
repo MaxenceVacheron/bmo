@@ -10,6 +10,8 @@ StandardOutput=inherit
 StandardError=inherit
 Restart=always
 User=root
+Nice=19
+IOSchedulingClass=idle
 
 [Install]
 WantedBy=multi-user.target

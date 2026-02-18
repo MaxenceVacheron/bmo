@@ -29,7 +29,7 @@ READ_RECEIPT_URL = "https://bmo.pg.maxencevacheron.fr/read"
 
 def load_config():
     """Load configuration from file"""
-    defaults = {"brightness": 1.0, "default_mode": "FACE", "power_save": False, "face_target_fps": 30}
+    defaults = {"brightness": 1.0, "default_mode": "FACE", "power_save": False, "face_target_fps": 10} # Reduced from 30
     if os.path.exists(CONFIG_FILE):
         try:
             with open(CONFIG_FILE, 'r') as f:
@@ -2721,7 +2721,12 @@ def main():
         
         # --- UPDATE PHASE ---
         now = time.time()
-        always_update = state["mode"] in ["SNAKE", "GIF_PLAYER", "STARTUP", "SLIDESHOW", "CLOCK", "ADVANCED_STATS", "FOCUS", "HEART", "MESSAGE_VIEW", "RANDOM_GIF", "COMPOSE"]
+        # modes that need high-frequency updates
+        needs_high_fps = state["mode"] in ["SNAKE", "GIF_PLAYER", "RANDOM_GIF"]
+        # modes that need low-frequency updates (e.g. once per second or interaction)
+        is_slow_mode = state["mode"] in ["CLOCK", "FOCUS", "ADVANCED_STATS", "MESSAGE_VIEW", "COMPOSE"]
+        
+        always_update = needs_high_fps or (is_slow_mode and int(now) != int(now - (1/current_fps)))
         
         # Inactivity Check
         if state["mode"] in ["MENU", "STATS", "CLOCK", "NOTES", "HEART", "SETTINGS", "GAMES"]:
@@ -2815,9 +2820,12 @@ def main():
         current_fps = 30
         if state["mode"] == "FACE":
             if state["power_save"]:
-                current_fps = 5
+                current_fps = 2 # Reduced from 5
             else:
-                current_fps = state.get("face_target_fps", 30)
+                current_fps = state.get("face_target_fps", 10)
+        elif state["mode"] in ["MENU", "STATS", "SETTINGS", "GAMES", "FACE_FPS", "BRIGHTNESS", "POWER", "DEFAULT_MODE", "NEXTCLOUD", "D_PHOTO", "D_GIF", "D_TEXT"]:
+             # Low FPS for static menus
+             current_fps = 10
         
         # Auto-Dimming in Power Save Mode
         if state["power_save"] and now - state["last_interaction"] > 120: # 2 minutes

@@ -22,8 +22,16 @@ elif [ -e /sys/class/leds/led1 ]; then
 fi
 
 # 3. Enable Bluetooth
-echo "📡 Enabling Bluetooth..."
-sudo systemctl start bluetooth.service || true
-sudo systemctl enable bluetooth.service || true
+# echo "📡 Enabling Bluetooth..."
+# sudo systemctl start bluetooth.service || true
+# sudo systemctl enable bluetooth.service || true
+
+# 4. Restore CPU Governor to ondemand
+echo "⚡ Restoring CPU Governor to ondemand..."
+echo ondemand | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor > /dev/null
+
+# 5. Enable HDMI power
+echo "🔌 Enabling HDMI output..."
+sudo vcgencmd display_power 1 || true
 
 echo "✅ Default Power Mode Restored."
