@@ -275,7 +275,8 @@ state = {
             "end_time": 0,
             "next_time": time.time() + 20,
             "notes": []
-        }
+        },
+        "next_heart_time": time.time() + 300 # Random Heart every 5-10 mins
     },
     "startup": {
         "message": "Hello Agnès! I'm BMO. Maxence built my brain just for you.",
@@ -1435,6 +1436,16 @@ def update_face():
             
     # --- IDLE BEHAVIORS ---
     if not state["focus"]["active"]:
+        # 0. Random Heart Mode Trigger
+        if now > state["idle"]["next_heart_time"]:
+            print("🎲 Random Heart Triggered!")
+            state["mode"] = "HEART"
+            state["last_interaction"] = now # Resets inactivity timeout (stays for 20s)
+            state["idle"]["next_heart_time"] = now + random.uniform(300, 600)
+            state["needs_redraw"] = True
+            sys.stdout.flush()
+            return # Don't process other idle behaviors this frame
+
         # 1. Thought Bubbles
         if not state["idle"]["thought"]["is_active"]:
             if now > state["idle"]["thought"]["next_time"]:
