@@ -981,7 +981,7 @@ def _load_gif_frames(gif_path):
                 img_w, img_h = frame.size
                 scale = min(WIDTH / img_w, HEIGHT / img_h)
                 new_size = (int(img_w * scale), int(img_h * scale))
-                frame = frame.resize(new_size, Image.Resampling.NEAREST)  # NEAREST for pixel art
+                frame = frame.resize(new_size, Image.Resampling.LANCZOS)  # LANCZOS for smooth GIFs
                 
                 # Convert to Pygame
                 mode = frame.mode
@@ -1216,7 +1216,7 @@ def load_random_face(emotion=None):
             def _prep_surf(path):
                 if not os.path.exists(path): return None
                 img = Image.open(path).convert('RGB')
-                img = img.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
+                img = img.resize((WIDTH, HEIGHT), Image.Resampling.NEAREST) # NEAREST for pixelated faces
                 data = img.tobytes()
                 pygame_img = pygame.image.fromstring(data, img.size, img.mode)
                 
