@@ -346,7 +346,9 @@ state = {
         "last_key": None,
         "last_key_time": 0,
         "press_count": 0
-    }
+    },
+    "saved_menu_stack": ["MAIN"],
+    "saved_menu_page": 0
 }
 
 def load_messages():
@@ -1597,9 +1599,14 @@ def draw_menu(screen):
     current_menu_id = state["menu_stack"][-1]
     items = MENUS.get(current_menu_id, MENUS["MAIN"])
     
-    pygame.draw.rect(screen, BLACK, (0, 0, WIDTH, 50))
-    title = FONT_MEDIUM.render(f"BMO MENU: {current_menu_id}", False, WHITE)
-    screen.blit(title, (WIDTH//2 - title.get_width()//2, 10))
+    # Sub-menu detection
+    is_submenu = (current_menu_id != "MAIN")
+    banner_height = 35 if is_submenu else 50
+    title_font = FONT_SMALL if is_submenu else FONT_MEDIUM
+    
+    pygame.draw.rect(screen, BLACK, (0, 0, WIDTH, banner_height))
+    title = title_font.render(f"BMO MENU: {current_menu_id}", False, WHITE)
+    screen.blit(title, (WIDTH//2 - title.get_width()//2, (banner_height - title.get_height())//2))
     
     # Pagination Logic (2x2 Grid = 4 items per page)
     items_per_page = 4
@@ -1628,7 +1635,13 @@ def draw_menu(screen):
         by = start_y + r * (btn_h + gap)
         
         btn_rect = (bx, by, btn_w, btn_h)
-        pygame.draw.rect(screen, item.get("color", GRAY), btn_rect, border_radius=10)
+        
+        # Force RED for BACK buttons in sub-menus (or generally)
+        color = item.get("color", GRAY)
+        if item["action"] == "BACK" or item["label"] == "EXIT":
+             color = RED
+             
+        pygame.draw.rect(screen, color, btn_rect, border_radius=10)
         
         # Two-line text wrapping if too long
         label = item["label"]
@@ -1704,7 +1717,7 @@ def draw_notes(screen):
     for l in lines:
         surf = FONT_MEDIUM.render(l, False, WHITE)
         screen.blit(surf, (WIDTH//2 - surf.get_width()//2, y))
-        y += 40
+        # y += 40
 
 def draw_messages_menu(screen):
     screen.fill(PINK)
@@ -2298,10 +2311,14 @@ def main():
                                 threading.Thread(target=send_read_receipt, args=(msg_id,), daemon=True).start()
                                 continue
 
-                        # Normal face tap -> Menu
+                        # Normal face tap -> Menu (Restore state if exists, else Main)
                         state["mode"] = "MENU"
-                        state["menu_stack"] = ["MAIN"]
-                        state["menu_page"] = 0 # Reset page when entering menu
+                        if state["saved_menu_stack"]:
+                            state["menu_stack"] = list(state["saved_menu_stack"])
+                            state["menu_page"] = state["saved_menu_page"]
+                        else:
+                            state["menu_stack"] = ["MAIN"]
+                            state["menu_page"] = 0
                     
                     state["needs_redraw"] = True
                 
@@ -2343,7 +2360,10 @@ def main():
                         if action == "BACK":
                             state["menu_stack"].pop()
                             state["menu_page"] = 0 # Reset page when going back
-                            if not state["menu_stack"]: switch_to_face_mode()
+                            if not state["menu_stack"]:
+                                switch_to_face_mode()
+                                state["saved_menu_stack"] = ["MAIN"]
+                                state["saved_menu_page"] = 0
                         elif action.startswith("MENU:"):
                             state["menu_stack"].append(action.split(":")[1])
                             state["menu_page"] = 0 # Reset page for new menu
@@ -2399,17 +2419,28 @@ def main():
                             except: pass
                             os.system("sudo reboot")
                             sys.exit(0)
+                        
+                        # Save state before switching to these modes
+                        if action.startswith("MODE:") or action.startswith("SLIDESHOW:") or action.startswith("GIF:") or action.startswith("TEXT:") or action.startswith("FOCUS:") or action.startswith("SNAKE"):
+                             # Don't save if it's just a menu navigation
+                             if not action.startswith("MENU:"):
+                                 state["saved_menu_stack"] = list(state["menu_stack"])
+                                 state["saved_menu_page"] = state["menu_page"]
                 
                 elif state["mode"] == "FOCUS":
-                    # If active, ignore touches? Or allow double tap to cancel?
-                    # For now: Any touch returns to menu (CANCEL)
                     # But if Timer Ended: Return to Face
                     remaining = state["focus"]["end_time"] - time.time()
                     if remaining <= 0:
                         switch_to_face_mode()
                     else:
-                        # Cancel Timer?
-                        state["mode"] = "MENU" # Or ask confirmation?
+                        # CENTER: Exit to menu (Restore State)
+                        state["mode"] = "MENU"
+                        if state["saved_menu_stack"]:
+                            state["menu_stack"] = list(state["saved_menu_stack"])
+                            state["menu_page"] = state["saved_menu_page"]
+                        else:
+                             state["menu_stack"] = ["MAIN"]
+                             state["menu_page"] = 0 # Or ask confirmation?
                 
                 
                 elif state["mode"] in ["SLIDESHOW", "GIF_PLAYER", "TEXT_VIEWER"]:
@@ -2447,8 +2478,14 @@ def main():
                                 load_next_gif()
                     
                     else:
-                        # CENTER: Exit to menu
+                        # CENTER: Exit to menu (Restore State)
                         state["mode"] = "MENU"
+                        if state["saved_menu_stack"]:
+                            state["menu_stack"] = list(state["saved_menu_stack"])
+                            state["menu_page"] = state["saved_menu_page"]
+                        else:
+                             state["menu_stack"] = ["MAIN"]
+                             state["menu_page"] = 0
                 
                 elif state["mode"] == "MESSAGES":
                     # Exit
@@ -2517,6 +2554,12 @@ def main():
                     if state["snake"]:
                         if state["snake"].game_over:
                             state["mode"] = "MENU"
+                            if state["saved_menu_stack"]:
+                                state["menu_stack"] = list(state["saved_menu_stack"])
+                                state["menu_page"] = state["saved_menu_page"]
+                            else:
+                                state["menu_stack"] = ["MAIN"]
+                                state["menu_page"] = 0
                         else:
                             state["snake"].handle_input((x, y))
                 
