@@ -211,33 +211,27 @@ MENUS = {
         {"label": "< BACK", "action": "BACK", "color": GRAY},
     ],
     "NEXTCLOUD": [
-        {"label": "DEFAULT", "action": "MENU:NC_DEFAULT", "color": YELLOW},
-        {"label": "PERSO", "action": "MENU:NC_PERSO", "color": GREEN},
+        {"label": "PHOTOS", "action": "MENU:D_PHOTO", "color": YELLOW},
+        {"label": "GIFs", "action": "MENU:D_GIF", "color": GREEN},
+        {"label": "TEXTES", "action": "MENU:D_TEXT", "color": BLUE},
         {"label": "< BACK", "action": "BACK", "color": GRAY},
     ],
-    "NC_DEFAULT": [
-        {"label": "PHOTOS", "action": "MENU:DEFAULT_PHOTOS", "color": YELLOW},
-        {"label": "TEXTES", "action": "TEXT:default", "color": GREEN},
+    "D_PHOTO": [
+        {"label": "DEFAULT", "action": "SLIDESHOW:default", "color": YELLOW},
+        {"label": "PERSO", "action": "SLIDESHOW:perso", "color": PINK},
+        {"label": "PUBLIC", "action": "SLIDESHOW:public", "color": BLUE},
         {"label": "< BACK", "action": "BACK", "color": GRAY},
     ],
-    "NC_PERSO": [
-        {"label": "PHOTOS", "action": "MENU:PERSO_PHOTOS", "color": PINK},
-        {"label": "TEXTES", "action": "TEXT:perso", "color": BLUE},
+    "D_GIF": [
+        {"label": "DEFAULT", "action": "GIF:default", "color": GREEN},
+        {"label": "PERSO", "action": "GIF:perso", "color": PINK},
+        {"label": "PUBLIC", "action": "GIF:public", "color": BLUE},
         {"label": "< BACK", "action": "BACK", "color": GRAY},
     ],
-    "DEFAULT_PHOTOS": [
-        {"label": "GIFs", "action": "GIF:default", "color": GREEN},
-        {"label": "Images", "action": "SLIDESHOW:default", "color": YELLOW},
-        {"label": "< BACK", "action": "BACK", "color": GRAY},
-    ],
-    "PERSO_PHOTOS": [
-        {"label": "GIFs", "action": "GIF:perso", "color": GREEN},
-        {"label": "Images", "action": "SLIDESHOW:perso", "color": PINK},
-        {"label": "< BACK", "action": "BACK", "color": GRAY},
-    ],
-    "TEXTES": [
-        {"label": "PERSO", "action": "TEXT:Perso", "color": PINK},
-        {"label": "REMOTE", "action": "TEXT:Remote", "color": BLUE},
+    "D_TEXT": [
+        {"label": "DEFAULT", "action": "TEXT:default", "color": GREEN},
+        {"label": "PERSO", "action": "TEXT:perso", "color": BLUE},
+        {"label": "PUBLIC", "action": "TEXT:public", "color": PINK},
         {"label": "< BACK", "action": "BACK", "color": GRAY},
     ]
 }
