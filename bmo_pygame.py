@@ -206,7 +206,7 @@ MENUS = {
     "FOCUS": [
         {"label": "30 MIN", "action": "FOCUS:30", "color": GREEN},
         {"label": "1 HOUR", "action": "FOCUS:60", "color": TEAL},
-        {"label": "CUSTOM", "action": "MENU:FOCUS_CUSTOM", "color": YELLOW},
+        {"label": "CUSTOM", "action": "MODE:FOCUS_CUSTOM", "color": YELLOW},
         {"label": "< BACK", "action": "BACK", "color": GRAY},
     ],
     "FOCUS_CUSTOM": [
@@ -2858,10 +2858,16 @@ def draw_focus_custom(screen):
         screen.blit(lbl, (kx + (kw - lbl.get_width())//2, ky + (kh - lbl.get_height())//2))
         
     # START Action
-    ax, ay = (WIDTH - 150) // 2, HEIGHT - 50
-    pygame.draw.rect(screen, GREEN, (ax, ay, 150, 40), border_radius=8)
+    ax, ay = (WIDTH - 150) // 2 + 80, HEIGHT - 50
+    pygame.draw.rect(screen, GREEN, (ax, ay, 120, 40), border_radius=8)
     lbl_s = FONT_SMALL.render("START", True, WHITE)
-    screen.blit(lbl_s, (ax + (150 - lbl_s.get_width())//2, ay + 10))
+    screen.blit(lbl_s, (ax + (120 - lbl_s.get_width())//2, ay + 10))
+    
+    # BACK Action
+    bx, by = (WIDTH - 150) // 2 - 50, HEIGHT - 50
+    pygame.draw.rect(screen, RED, (bx, by, 120, 40), border_radius=8)
+    lbl_b = FONT_SMALL.render("BACK", True, WHITE)
+    screen.blit(lbl_b, (bx + (120 - lbl_b.get_width())//2, by + 10))
 
 def handle_focus_custom_touch(pos):
     """Process touches for custom focus keypad"""
@@ -2872,14 +2878,25 @@ def handle_focus_custom_touch(pos):
     gap = 10
     start_kx = (WIDTH - (3 * kw + 2 * gap)) // 2
     
-    # 1. START Button
-    ax, ay = (WIDTH - 150) // 2, HEIGHT - 50
-    if ax < x < ax + 150 and ay < y < ay + 40:
-        val = state["focus"]["custom_input"]
-        if val and int(val) > 0:
-            start_focus_timer(int(val))
-            state["focus"]["custom_input"] = ""
-        return
+    # 1. Action Buttons
+    ay = HEIGHT - 50
+    if ay < y < ay + 40:
+        # START
+        ax = (WIDTH - 150) // 2 + 80
+        if ax < x < ax + 120:
+            val = state["focus"]["custom_input"]
+            if val and int(val) > 0:
+                start_focus_timer(int(val))
+                state["focus"]["custom_input"] = ""
+            return
+        
+        # BACK
+        bx = (WIDTH - 150) // 2 - 50
+        if bx < x < bx + 120:
+            state["mode"] = "MENU"
+            # Optional: pop from stack if we want to be clean, 
+            # but setting mode to MENU usually triggers draw_menu with the current stack.
+            return
 
     # 2. Keypad Hits
     if kb_y <= y < kb_y + 4 * (kh + gap):
