@@ -204,11 +204,15 @@ MENUS = {
         {"label": "< BACK", "action": "BACK", "color": GRAY},
     ],
     "FOCUS": [
-        {"label": "15 MIN", "action": "FOCUS:15", "color": GREEN},
-        {"label": "25 MIN (Pomo)", "action": "FOCUS:25", "color": TEAL},
-        {"label": "45 MIN", "action": "FOCUS:45", "color": YELLOW},
-        {"label": "60 MIN", "action": "FOCUS:60", "color": RED},
+        {"label": "30 MIN", "action": "FOCUS:30", "color": GREEN},
+        {"label": "1 HOUR", "action": "FOCUS:60", "color": TEAL},
+        {"label": "CUSTOM", "action": "MENU:FOCUS_CUSTOM", "color": YELLOW},
         {"label": "< BACK", "action": "BACK", "color": GRAY},
+    ],
+    "FOCUS_CUSTOM": [
+        # This is a virtual menu handled by MODE:FOCUS_CUSTOM
+        {"label": "START", "action": "START_CUSTOM_FOCUS", "color": GREEN},
+        {"label": "< BACK", "action": "BACK", "color": RED},
     ],
     "NEXTCLOUD": [
         {"label": "PHOTOS", "action": "MENU:D_PHOTO", "color": YELLOW},
@@ -297,7 +301,8 @@ state = {
         "duration": 0,
         "active": False,
         "blink_timer": 0,
-        "showing_confirmation": False
+        "showing_confirmation": False,
+        "custom_input": ""
     },
     "gif_player": {
         "path": "",
@@ -1328,7 +1333,7 @@ def update_face():
     # Update BMO's face state (blinking, image rotation, and needs)
     now = time.time()
     
-    # FOCUS CHECK
+    # FOCUS CHECK (Purely static during focus)
     if state["focus"]["active"]:
         remaining = state["focus"]["end_time"] - now
         if remaining <= 0:
@@ -1407,11 +1412,12 @@ def update_face():
     state["needs"]["hearts"] = still_alive
 
     # Dynamic rotation interval (Original logic)
-    interval = 22.5 if state.get("emotion") == "negative" else 45.0
-    
-    if now - state["last_face_switch"] > interval:
-        print(f"Rotating face image (Emotion: {state.get('emotion')}, Interval: {interval}s)...")
-        load_random_face()
+    if not state["focus"]["active"]:
+        interval = 22.5 if state.get("emotion") == "negative" else 45.0
+        
+        if now - state["last_face_switch"] > interval:
+            print(f"Rotating face image (Emotion: {state.get('emotion')}, Interval: {interval}s)...")
+            load_random_face()
     
     # Blinking logic (decreased frequency: 8-20 seconds)
     if state["is_blinking"]:
@@ -1419,7 +1425,7 @@ def update_face():
             state["is_blinking"] = False
             state["blink_timer"] = now + random.uniform(8.0, 20.0)
             state["needs_redraw"] = True
-    else:
+    elif not state["focus"]["active"]: # Suppression check
         if now > state["blink_timer"]:
             state["is_blinking"] = True
             state["blink_end_time"] = now + 0.15 # Blink duration
@@ -1428,22 +1434,23 @@ def update_face():
             sys.stdout.flush()
             
     # --- IDLE BEHAVIORS ---
-    # 1. Thought Bubbles
-    if not state["idle"]["thought"]["is_active"]:
-        if now > state["idle"]["thought"]["next_time"]:
-            surf = load_thought_bubble()
-            if surf:
-                state["idle"]["thought"]["is_active"] = True
-                state["idle"]["thought"]["current_image"] = surf
-                state["idle"]["thought"]["end_time"] = now + random.uniform(5, 10)
+    if not state["focus"]["active"]:
+        # 1. Thought Bubbles
+        if not state["idle"]["thought"]["is_active"]:
+            if now > state["idle"]["thought"]["next_time"]:
+                surf = load_thought_bubble()
+                if surf:
+                    state["idle"]["thought"]["is_active"] = True
+                    state["idle"]["thought"]["current_image"] = surf
+                    state["idle"]["thought"]["end_time"] = now + random.uniform(5, 10)
+                    state["needs_redraw"] = True
+                    print("BMO is thinking...")
+                    sys.stdout.flush()
+        else:
+            if now > state["idle"]["thought"]["end_time"]:
+                state["idle"]["thought"]["is_active"] = False
+                state["idle"]["thought"]["next_time"] = now + random.uniform(30, 120)
                 state["needs_redraw"] = True
-                print("BMO is thinking...")
-                sys.stdout.flush()
-    else:
-        if now > state["idle"]["thought"]["end_time"]:
-            state["idle"]["thought"]["is_active"] = False
-            state["idle"]["thought"]["next_time"] = now + random.uniform(30, 120)
-            state["needs_redraw"] = True
 
     # 2. Humming (Only when positive)
     if state["emotion"] == "positive":
@@ -2514,6 +2521,9 @@ def main():
                                  state["saved_menu_stack"] = list(state["menu_stack"])
                                  state["saved_menu_page"] = state["menu_page"]
                 
+                elif state["mode"] == "FOCUS_CUSTOM":
+                    handle_focus_custom_touch((x, y))
+                
                 elif state["mode"] == "FOCUS":
                     # But if Timer Ended: Return to Face
                     remaining = state["focus"]["end_time"] - time.time()
@@ -2749,6 +2759,8 @@ def main():
                 draw_text_viewer(screen)
             elif state["mode"] == "FOCUS":
                 draw_focus_face(screen)
+            elif state["mode"] == "FOCUS_CUSTOM":
+                draw_focus_custom(screen)
             elif state["mode"] == "FACE": 
                 draw_face(screen)
             elif state["mode"] == "WEATHER":
@@ -2810,3 +2822,79 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+def draw_focus_custom(screen):
+    """Draw a numeric keypad to enter custom focus minutes"""
+    screen.fill(WHITE)
+    
+    # Header
+    pygame.draw.rect(screen, TEAL, (0, 0, WIDTH, 45))
+    title = FONT_SMALL.render("CUSTOM FOCUS (MINS)", True, BLACK)
+    screen.blit(title, (WIDTH//2 - title.get_width()//2, 12))
+    
+    # Input Display
+    val = state["focus"]["custom_input"]
+    if not val: val = "0"
+    disp = FONT_LARGE.render(val, True, BLACK)
+    screen.blit(disp, (WIDTH//2 - disp.get_width()//2, 60))
+    
+    # Keypad (0-9)
+    kb_y = 120
+    kw, kh = 80, 40
+    gap = 10
+    start_kx = (WIDTH - (3 * kw + 2 * gap)) // 2
+    
+    keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "DEL"]
+    for i, k in enumerate(keys):
+        if not k: continue
+        r, c = i // 3, i % 3
+        kx = start_kx + c * (kw + gap)
+        ky = kb_y + r * (kh + gap)
+        
+        color = RED if k == "DEL" else TEAL
+        pygame.draw.rect(screen, color, (kx, ky, kw, kh), border_radius=5)
+        lbl_col = WHITE if k == "DEL" else BLACK
+        lbl = FONT_SMALL.render(k, True, lbl_col)
+        screen.blit(lbl, (kx + (kw - lbl.get_width())//2, ky + (kh - lbl.get_height())//2))
+        
+    # START Action
+    ax, ay = (WIDTH - 150) // 2, HEIGHT - 50
+    pygame.draw.rect(screen, GREEN, (ax, ay, 150, 40), border_radius=8)
+    lbl_s = FONT_SMALL.render("START", True, WHITE)
+    screen.blit(lbl_s, (ax + (150 - lbl_s.get_width())//2, ay + 10))
+
+def handle_focus_custom_touch(pos):
+    """Process touches for custom focus keypad"""
+    x, y = pos
+    
+    kb_y = 120
+    kw, kh = 80, 40
+    gap = 10
+    start_kx = (WIDTH - (3 * kw + 2 * gap)) // 2
+    
+    # 1. START Button
+    ax, ay = (WIDTH - 150) // 2, HEIGHT - 50
+    if ax < x < ax + 150 and ay < y < ay + 40:
+        val = state["focus"]["custom_input"]
+        if val and int(val) > 0:
+            start_focus_timer(int(val))
+            state["focus"]["custom_input"] = ""
+        return
+
+    # 2. Keypad Hits
+    if kb_y <= y < kb_y + 4 * (kh + gap):
+        c = (x - start_kx) // (kw + gap)
+        r = (y - kb_y) // (kh + gap)
+        idx = int(r * 3 + c)
+        
+        keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "DEL"]
+        if 0 <= idx < len(keys):
+            k = keys[idx]
+            if k.isdigit():
+                if len(state["focus"]["custom_input"]) < 3: # Max 999 mins
+                    state["focus"]["custom_input"] += k
+            elif k == "DEL":
+                if state["focus"]["custom_input"]:
+                    state["focus"]["custom_input"] = state["focus"]["custom_input"][:-1]
+        
+    state["needs_redraw"] = True
