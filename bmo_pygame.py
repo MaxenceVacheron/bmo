@@ -1420,11 +1420,11 @@ def update_face():
             print(f"Rotating face image (Emotion: {state.get('emotion')}, Interval: {interval}s)...")
             load_random_face()
     
-    # Blinking logic (decreased frequency: 8-20 seconds)
+    # Blinking logic (decreased frequency: 2-8 seconds)
     if state["is_blinking"]:
         if now > state["blink_end_time"]:
             state["is_blinking"] = False
-            state["blink_timer"] = now + random.uniform(8.0, 20.0)
+            state["blink_timer"] = now + random.uniform(2.0, 8.0)
             state["needs_redraw"] = True
     elif not state["focus"]["active"]: # Suppression check
         if now > state["blink_timer"]:
