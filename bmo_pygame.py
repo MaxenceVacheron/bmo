@@ -172,7 +172,7 @@ MENUS = {
         {"label": "SYSTEM", "action": "MODE:ADVANCED_STATS", "color": GRAY},
         {"label": "NOTES", "action": "MODE:NOTES", "color": RED},
         {"label": "SETTINGS", "action": "MENU:SETTINGS", "color": GRAY},
-    ],
+    ] + ([{"label": "HUB", "action": "SYSTEM:HUB", "color": (178, 132, 220)}] if DEVICE_NAME == "AMO" else []),
     "GAMES": [
         {"label": "SNAKE", "action": "MODE:SNAKE", "color": GREEN},
         {"label": "< BACK", "action": "BACK", "color": GRAY},
@@ -2534,13 +2534,16 @@ def main():
                             screen.fill(BLACK)
                             lbl = FONT_MEDIUM.render("REBOOTING...", True, RED)
                             screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, HEIGHT//2))
-                            # Force write to framebuffer
                             try:
                                 with open(FB_DEVICE, "wb") as f:
                                     f.write(screen.get_buffer())
                             except: pass
                             os.system("sudo reboot")
                             sys.exit(0)
+                        elif action == "SYSTEM:HUB":
+                            print("🔄 Switching to Hub...")
+                            sys.stdout.flush()
+                            os.execv(sys.executable, [sys.executable, "/home/pi/bmo/hub.py"])
                         
                         # Save state before switching to these modes
                         if action.startswith("MODE:") or action.startswith("SLIDESHOW:") or action.startswith("GIF:") or action.startswith("TEXT:") or action.startswith("FOCUS:") or action.startswith("SNAKE"):
