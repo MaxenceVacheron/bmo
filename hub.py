@@ -59,6 +59,7 @@ except:
 state = {
     "mode": "DASHBOARD",  # DASHBOARD, APPS
     "needs_redraw": True,
+    "tap_debug": {"pos": None, "time": 0},  # Crosshair debug
     "weather": {
         "temp": "--",
         "city": "...",
@@ -270,6 +271,16 @@ def draw_dashboard(surface):
     desc_lbl = FONT_TINY.render(state["weather"]["desc"], True, GRAY_DIM)
     surface.blit(desc_lbl, (WIDTH - desc_lbl.get_width() - card_margin, btn_y + 10))
 
+    # --- Tap crosshair debug ---
+    tap = state["tap_debug"]
+    if tap["pos"] and time.time() - tap["time"] < 2.0:
+        tx, ty = tap["pos"]
+        pygame.draw.line(surface, RED, (tx - 15, ty), (tx + 15, ty), 2)
+        pygame.draw.line(surface, RED, (tx, ty - 15), (tx, ty + 15), 2)
+        pygame.draw.circle(surface, RED, (tx, ty), 8, 1)
+        coord_lbl = FONT_TINY.render(f"({tx},{ty})", True, RED)
+        surface.blit(coord_lbl, (tx + 12, ty - 16))
+
 
 # --- TOUCH ---
 def find_touch_device():
@@ -381,6 +392,7 @@ def main():
                     x, y = event.pos
                     print(f"🔘 Hub tap: ({x}, {y})")
                     sys.stdout.flush()
+                    state["tap_debug"] = {"pos": (x, y), "time": time.time()}
                     state["needs_redraw"] = True
 
                     if state["mode"] == "DASHBOARD":
