@@ -293,6 +293,19 @@ class SetupHandler(BaseHTTPRequestHandler):
         sys.stdout.flush()
 
     def do_GET(self):
+        # Captive Portal detection paths
+        captive_paths = [
+            "/generate_204", "/gen_204", "/ncsi.txt", "/success.html", 
+            "/hotspot-detect.html", "/connectivity-check.html"
+        ]
+        
+        if any(self.path.startswith(p) for p in captive_paths):
+            print(f"🚩 Captive Portal query: {self.path} -> Redirecting to /")
+            self.send_response(302)
+            self.send_header("Location", f"http://{LISTEN_HOST if LISTEN_HOST != '0.0.0.0' else '192.168.4.1'}/")
+            self.end_headers()
+            return
+
         device_name = read_device_name()
         current_ssid = read_current_wifi()
         messages_url = get_messages_url()

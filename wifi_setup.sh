@@ -80,7 +80,24 @@ EOF
 interface=$INTERFACE
 bind-interfaces
 dhcp-range=${DHCP_RANGE_START},${DHCP_RANGE_END},255.255.255.0,24h
-# Redirect all DNS queries to the hotspot IP (captive portal)
+
+# Redirect specific captive portal detection domains (OS native triggers)
+address=/connectivitycheck.gstatic.com/${HOTSPOT_IP}
+address=/clients3.google.com/${HOTSPOT_IP}
+address=/connectivitycheck.android.com/${HOTSPOT_IP}
+address=/connectivitycheck.android.com/${HOTSPOT_IP}
+address=/connectivity-check.ubuntu.com/${HOTSPOT_IP}
+address=/detectportal.firefox.com/${HOTSPOT_IP}
+address=/www.apple.com/${HOTSPOT_IP}
+address=/apple.com/${HOTSPOT_IP}
+address=/itools.info/${HOTSPOT_IP}
+address=/ibook.info/${HOTSPOT_IP}
+address=/airport.us/${HOTSPOT_IP}
+address=/thinkdifferent.us/${HOTSPOT_IP}
+address=/www.msftncsi.com/${HOTSPOT_IP}
+address=/www.msftconnecttest.com/${HOTSPOT_IP}
+
+# Blanket redirect for everything else (as fallback)
 address=/#/${HOTSPOT_IP}
 EOF
 
