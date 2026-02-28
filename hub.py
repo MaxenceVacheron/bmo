@@ -57,7 +57,7 @@ except:
 
 # --- STATE ---
 state = {
-    "mode": "DASHBOARD",  # DASHBOARD, APPS
+    "mode": "DASHBOARD",  # DASHBOARD, SYSMON
     "needs_redraw": True,
     "tap_debug": {"pos": None, "time": 0},  # Crosshair debug
     "weather": {
@@ -343,18 +343,145 @@ def switch_to_amo():
     os.execv(sys.executable, [sys.executable, "/home/pi/bmo/bmo_pygame.py"])
 
 def launch_btop():
-    """Launch btop on the framebuffer console, return to hub when done"""
-    print("🖥️ Launching btop...")
+    """Switch to built-in system monitor view"""
+    print("🖥️ Switching to SYSMON...")
     sys.stdout.flush()
-    # Write a launcher script that runs btop and then returns to hub
-    launcher = "/tmp/hub_btop_launcher.sh"
-    with open(launcher, 'w') as f:
-        f.write("#!/bin/bash\n")
-        f.write("clear > /dev/tty1\n")
-        f.write("TERM=linux openvt -c 1 -w -- btop 2>/dev/null || openvt -c 1 -w -- htop 2>/dev/null || openvt -c 1 -w -- top\n")
-        f.write(f"exec {sys.executable} /home/pi/bmo/hub.py\n")
-    os.chmod(launcher, 0o755)
-    os.execv("/bin/bash", ["/bin/bash", launcher])
+    state["mode"] = "SYSMON"
+    state["needs_redraw"] = True
+
+def get_cpu_per_core():
+    """Get per-core CPU usage via /proc/stat snapshot"""
+    try:
+        with open('/proc/stat', 'r') as f:
+            lines = f.readlines()
+        cores = []
+        for line in lines:
+            if line.startswith('cpu') and not line.startswith('cpu '):
+                parts = line.split()
+                total = sum(int(x) for x in parts[1:])
+                idle = int(parts[4])
+                cores.append((total, idle))
+        return cores
+    except:
+        return []
+
+def get_top_processes(n=5):
+    """Get top N processes by CPU"""
+    try:
+        result = subprocess.check_output(
+            ['ps', '-eo', 'pid,pcpu,pmem,comm', '--sort=-pcpu', '--no-headers'],
+            timeout=3
+        ).decode('utf-8').strip().split('\n')[:n]
+        procs = []
+        for line in result:
+            parts = line.split()
+            if len(parts) >= 4:
+                procs.append({
+                    'pid': parts[0],
+                    'cpu': parts[1],
+                    'mem': parts[2],
+                    'name': ' '.join(parts[3:])
+                })
+        return procs
+    except:
+        return []
+
+def get_uptime():
+    """Get system uptime"""
+    try:
+        with open('/proc/uptime', 'r') as f:
+            secs = float(f.read().split()[0])
+        days = int(secs // 86400)
+        hours = int((secs % 86400) // 3600)
+        mins = int((secs % 3600) // 60)
+        if days > 0:
+            return f"{days}d {hours}h {mins}m"
+        return f"{hours}h {mins}m"
+    except:
+        return "--"
+
+def draw_sysmon(surface):
+    """System monitor screen — mini btop"""
+    surface.fill(BG_DARK)
+    m = 8  # margin
+
+    # Header
+    pygame.draw.rect(surface, BG_CARD, (0, 0, WIDTH, 28))
+    title = FONT_SMALL.render("SYSTEM MONITOR", True, PURPLE_BRIGHT)
+    surface.blit(title, (WIDTH//2 - title.get_width()//2, 5))
+    up_lbl = FONT_TINY.render(f"up {get_uptime()}", True, GRAY)
+    surface.blit(up_lbl, (WIDTH - up_lbl.get_width() - m, 8))
+
+    y = 34
+
+    # CPU per-core bars
+    cores = get_cpu_per_core()
+    if not hasattr(state, '_prev_cores'):
+        state['_prev_cores'] = cores
+    prev = state.get('_prev_cores', cores)
+
+    lbl = FONT_TINY.render(f"CPU ({len(cores)} cores)  {get_cpu_temp():.0f}°C", True, WHITE)
+    surface.blit(lbl, (m, y))
+    y += 16
+
+    bar_h = 8
+    bar_gap = 3
+    for i, (total, idle) in enumerate(cores):
+        ptotal, pidle = prev[i] if i < len(prev) else (total, idle)
+        dt = total - ptotal
+        di = idle - pidle
+        usage = ((dt - di) / dt * 100) if dt > 0 else 0
+        usage = max(0, min(100, usage))
+
+        core_lbl = FONT_TINY.render(f"{i}", True, GRAY_DIM)
+        surface.blit(core_lbl, (m, y))
+        bar_x = m + 16
+        bar_w = WIDTH - bar_x - m
+        color = GREEN if usage < 50 else (YELLOW if usage < 80 else RED)
+        draw_progress_bar(surface, bar_x, y + 1, bar_w - 40, bar_h, usage, color)
+        pct_lbl = FONT_TINY.render(f"{usage:.0f}%", True, GRAY)
+        surface.blit(pct_lbl, (WIDTH - m - 32, y))
+        y += bar_h + bar_gap
+
+    state['_prev_cores'] = cores
+
+    # RAM & Disk
+    y += 4
+    ram_pct, ram_free = get_ram_usage()
+    disk_pct, disk_free = get_disk_usage()
+
+    lbl = FONT_TINY.render(f"RAM {ram_pct:.0f}% ({ram_free:.1f}G free)", True, WHITE)
+    surface.blit(lbl, (m, y))
+    ram_color = GREEN if ram_pct < 60 else (YELLOW if ram_pct < 85 else RED)
+    draw_progress_bar(surface, m, y + 14, WIDTH//2 - m - 4, bar_h, ram_pct, ram_color)
+
+    lbl = FONT_TINY.render(f"DISK {disk_pct:.0f}% ({disk_free:.1f}G free)", True, WHITE)
+    surface.blit(lbl, (WIDTH//2 + 4, y))
+    disk_color = GREEN if disk_pct < 60 else (YELLOW if disk_pct < 85 else RED)
+    draw_progress_bar(surface, WIDTH//2 + 4, y + 14, WIDTH//2 - m - 4, bar_h, disk_pct, disk_color)
+
+    y += 28
+
+    # Top processes
+    pygame.draw.line(surface, GRAY_DIM, (m, y), (WIDTH - m, y), 1)
+    y += 4
+    header = FONT_TINY.render("PID      CPU%  MEM%  PROCESS", True, PURPLE_DIM)
+    surface.blit(header, (m, y))
+    y += 14
+
+    procs = get_top_processes(6)
+    for p in procs:
+        line = f"{p['pid']:>5}  {p['cpu']:>5}  {p['mem']:>5}  {p['name'][:20]}"
+        color = WHITE if float(p['cpu']) < 10 else (YELLOW if float(p['cpu']) < 50 else RED)
+        lbl = FONT_TINY.render(line, True, color)
+        surface.blit(lbl, (m, y))
+        y += 13
+
+    # Back button
+    btn_y = HEIGHT - 32
+    draw_rounded_rect(surface, PURPLE, (m, btn_y, 80, 26), 6)
+    lbl = FONT_SMALL.render("← BACK", True, WHITE)
+    surface.blit(lbl, (m + 40 - lbl.get_width()//2, btn_y + 4))
 
 # --- MAIN ---
 def main():
@@ -400,14 +527,21 @@ def main():
                         # ← AMO button
                         if 12 < x < 102 and btn_y < y < btn_y + 32:
                             switch_to_amo()
-                        # BTOP button
+                        # BTOP/SYSMON button
                         elif WIDTH//2 - 50 < x < WIDTH//2 + 50 and btn_y < y < btn_y + 32:
                             launch_btop()
+                    elif state["mode"] == "SYSMON":
+                        # Back button
+                        if 8 < x < 88 and HEIGHT - 32 < y < HEIGHT - 6:
+                            state["mode"] = "DASHBOARD"
+                            state["needs_redraw"] = True
 
             # Redraw at ~2 FPS for dashboard (low CPU), faster if interaction
             if now - last_redraw > 0.5 or state["needs_redraw"]:
                 if state["mode"] == "DASHBOARD":
                     draw_dashboard(screen)
+                elif state["mode"] == "SYSMON":
+                    draw_sysmon(screen)
 
                 # Write to framebuffer
                 try:
