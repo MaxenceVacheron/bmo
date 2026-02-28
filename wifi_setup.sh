@@ -32,6 +32,8 @@ start_hotspot() {
     echo "  [2/7] Stopping conflicting services..." | tee -a "$LOG"
     systemctl stop wpa_supplicant 2>>"$LOG" || true
     systemctl stop dhcpcd 2>>"$LOG" || true
+    systemctl stop NetworkManager 2>>"$LOG" || true
+    nmcli device set $INTERFACE managed no 2>>"$LOG" || true
     systemctl stop dnsmasq 2>>"$LOG" || true
     systemctl stop hostapd 2>>"$LOG" || true
     # Unmask hostapd in case systemd masked it
@@ -145,10 +147,15 @@ stop_hotspot() {
     # Restart networking services
     killall wpa_supplicant 2>/dev/null || true
     rm -f /var/run/wpa_supplicant/$INTERFACE
+    
+    nmcli device set $INTERFACE managed yes 2>>"$LOG" || true
+    systemctl start NetworkManager 2>>"$LOG" || true
+    systemctl start dhcpcd 2>>"$LOG" || true
+    
     wpa_supplicant -B -i $INTERFACE -c /etc/wpa_supplicant/wpa_supplicant.conf 2>>"$LOG" || true
     
-    # Restart dhcpcd for IP assignment
-    systemctl restart dhcpcd 2>>"$LOG" || dhclient $INTERFACE 2>>"$LOG" || true
+    # Request DHCP
+    dhclient $INTERFACE 2>>"$LOG" || true
 
     echo "✅ Normal WiFi restored." | tee -a "$LOG"
 }
