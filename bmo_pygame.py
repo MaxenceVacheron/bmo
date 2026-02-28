@@ -2600,7 +2600,7 @@ def main():
                                 os.write(fb_fd, screen.get_buffer())
                             except: pass
                             # Start hotspot
-                            subprocess.run(["sudo", "/home/pi/bmo/wifi_setup.sh", "start"], timeout=15)
+                            subprocess.run(["sudo", "/home/pi/bmo/wifi_setup.sh", "start"], timeout=30)
                             # Start web server as subprocess
                             state["wifi_setup_proc"] = subprocess.Popen(
                                 ["sudo", sys.executable, "/home/pi/bmo/wifi_setup.py"],
