@@ -1933,8 +1933,8 @@ def draw_message_view(screen):
     hint = FONT_TINY.render("< TAP TO CLOSE", True, (200, 200, 200))
     screen.blit(hint, (20, HEIGHT - 30))
         
-    # REPLY Button - ONLY for AMO
-    if sender == "AMO":
+    # REPLY Button - ONLY for messages from the other device
+    if sender == OTHER_DEVICE:
         pygame.draw.rect(screen, TEAL, (WIDTH - 100, HEIGHT - 40, 80, 30), border_radius=5)
         lbl = FONT_TINY.render("REPLY", True, WHITE)
         screen.blit(lbl, (WIDTH - 60 - lbl.get_width()//2, HEIGHT - 33))
@@ -2107,7 +2107,7 @@ def handle_compose_touch(pos):
                 # SEND
                 msg = state["compose"]["text"].strip()
                 if msg:
-                    recipient = state["compose"].get("recipient", "AMO")
+                    recipient = state["compose"].get("recipient", OTHER_DEVICE)
                     threading.Thread(target=send_message, args=(msg, recipient), daemon=True).start()
                     state["compose"]["text"] = ""
                     state["compose"]["last_key"] = None
@@ -2700,7 +2700,7 @@ def main():
                         state["messages"]["show_confirm_delete"] = True
                         state["needs_redraw"] = True
                     # Check Reply Button
-                    elif sender == "AMO" and x > WIDTH - 100 and y > HEIGHT - 40:
+                    elif sender == OTHER_DEVICE and x > WIDTH - 100 and y > HEIGHT - 40:
                         print(f"🔘 Message View Click: REPLY to {sender}")
                         state["mode"] = "COMPOSE"
                         state["compose"]["text"] = ""
