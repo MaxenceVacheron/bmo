@@ -64,6 +64,19 @@ if ! python3 -c "import pygame" 2>/dev/null; then
     sudo pip3 install pygame Pillow evdev --break-system-packages 2>/dev/null || sudo pip3 install pygame Pillow evdev
 fi
 
+# Install hostapd and dnsmasq for WiFi Setup mode
+if ! dpkg -s hostapd dnsmasq > /dev/null 2>&1; then
+    echo "📦 Installing hostapd and dnsmasq for WiFi Setup..."
+    sudo apt-get install -y hostapd dnsmasq
+    sudo systemctl disable hostapd 2>/dev/null || true
+    sudo systemctl stop hostapd 2>/dev/null || true
+    sudo systemctl disable dnsmasq 2>/dev/null || true
+    sudo systemctl stop dnsmasq 2>/dev/null || true
+fi
+
+# Make WiFi setup script executable
+chmod +x /home/pi/bmo/wifi_setup.sh
+
 sudo systemctl daemon-reload
 # Sync service files
 sudo cp /home/pi/bmo/bmo.service /etc/systemd/system/bmo.service

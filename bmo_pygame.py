@@ -182,6 +182,7 @@ MENUS = {
         {"label": "POWER MGMT", "action": "MENU:POWER", "color": ORANGE},
         {"label": "FACE FPS", "action": "MENU:FACE_FPS", "color": PINK},
         {"label": "BOOT MODE", "action": "MENU:DEFAULT_MODE", "color": BLUE},
+        {"label": "WIFI SETUP", "action": "SYSTEM:WIFI_SETUP", "color": BLUE},
         {"label": "REBOOT", "action": "SYSTEM:REBOOT", "color": RED},
         {"label": "< BACK", "action": "BACK", "color": GRAY},
     ],
@@ -2254,6 +2255,48 @@ def draw_compose(screen):
         l2 = FONT_TINY.render(sub, True, GRAY if color == WHITE else WHITE)
         screen.blit(l2, (bx + col_w//2 - l2.get_width()//2, by + 35))
 
+def draw_wifi_setup(surface):
+    """Draw WiFi Setup mode screen with connection instructions"""
+    surface.fill(BLACK)
+    device_name = DEVICE_NAME
+    hotspot_name = f"{device_name}-Setup"
+
+    # Title
+    pygame.draw.rect(surface, BLUE, (0, 0, WIDTH, 50))
+    title = FONT_MEDIUM.render("WIFI SETUP", True, WHITE)
+    surface.blit(title, (WIDTH//2 - title.get_width()//2, 8))
+
+    # Instructions
+    y = 70
+    lines = [
+        ("1. Connect your phone to WiFi:", WHITE),
+        (f"   {hotspot_name}", TEAL),
+        ("", WHITE),
+        ("2. Open your browser at:", WHITE),
+        ("   http://192.168.4.1", TEAL),
+        ("", WHITE),
+        ("3. Configure and save!", WHITE),
+    ]
+    for text, color in lines:
+        if text:
+            lbl = FONT_SMALL.render(text, True, color)
+            surface.blit(lbl, (30, y))
+        y += 28
+
+    # Animated dot indicator
+    dot_phase = int(time.time() * 2) % 3
+    dots = "." * (dot_phase + 1)
+    status_lbl = FONT_TINY.render(f"Waiting for connection{dots}", True, GRAY)
+    surface.blit(status_lbl, (WIDTH//2 - status_lbl.get_width()//2, y + 10))
+
+    # EXIT button (bottom center)
+    btn_y = HEIGHT - 60
+    btn_w, btn_h = 160, 44
+    btn_x = WIDTH//2 - btn_w//2
+    pygame.draw.rect(surface, RED, (btn_x, btn_y, btn_w, btn_h), border_radius=8)
+    exit_lbl = FONT_SMALL.render("EXIT SETUP", True, WHITE)
+    surface.blit(exit_lbl, (btn_x + btn_w//2 - exit_lbl.get_width()//2, btn_y + 12))
+
 def main():
     # singleton check
     try:
@@ -2545,6 +2588,26 @@ def main():
                             print("🔄 Switching to Hub...")
                             sys.stdout.flush()
                             os.execv(sys.executable, [sys.executable, "/home/pi/bmo/hub.py"])
+                        elif action == "SYSTEM:WIFI_SETUP":
+                            print("📡 Starting WiFi Setup Mode...")
+                            sys.stdout.flush()
+                            # Show "Starting..." feedback
+                            screen.fill(BLACK)
+                            lbl = FONT_MEDIUM.render("Starting Setup...", True, BLUE)
+                            screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, HEIGHT//2 - 20))
+                            try:
+                                os.lseek(fb_fd, 0, os.SEEK_SET)
+                                os.write(fb_fd, screen.get_buffer())
+                            except: pass
+                            # Start hotspot
+                            subprocess.run(["sudo", "/home/pi/bmo/wifi_setup.sh", "start"], timeout=15)
+                            # Start web server as subprocess
+                            state["wifi_setup_proc"] = subprocess.Popen(
+                                ["sudo", sys.executable, "/home/pi/bmo/wifi_setup.py"],
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+                            )
+                            state["mode"] = "WIFI_SETUP"
+                            state["needs_redraw"] = True
                         
                         # Save state before switching to these modes
                         if action.startswith("MODE:") or action.startswith("SLIDESHOW:") or action.startswith("GIF:") or action.startswith("TEXT:") or action.startswith("FOCUS:") or action.startswith("SNAKE"):
@@ -2736,6 +2799,29 @@ def main():
                             print(f"🔘 Snake Click: Screen Input at ({x}, {y})")
                             state["snake"].handle_input((x, y))
                 
+                elif state["mode"] == "WIFI_SETUP":
+                    # EXIT button at the bottom
+                    btn_y = HEIGHT - 60
+                    if WIDTH//2 - 80 < x < WIDTH//2 + 80 and btn_y < y < btn_y + 44:
+                        print("📡 Exiting WiFi Setup Mode...")
+                        sys.stdout.flush()
+                        # Kill web server
+                        if state.get("wifi_setup_proc"):
+                            try:
+                                state["wifi_setup_proc"].terminate()
+                                state["wifi_setup_proc"].wait(timeout=3)
+                            except: pass
+                            state["wifi_setup_proc"] = None
+                        # Stop hotspot and restore WiFi
+                        subprocess.run(["sudo", "/home/pi/bmo/wifi_setup.sh", "stop"], timeout=15)
+                        # Clean up done flag
+                        try: os.remove("/tmp/bmo_wifi_setup_done")
+                        except: pass
+                        state["mode"] = "MENU"
+                        state["menu_stack"] = ["MAIN", "SETTINGS"]
+                        state["menu_page"] = 0
+                        state["needs_redraw"] = True
+
                 else: 
                     print(f"🔘 General Click: Mode was {state['mode']} at ({x}, {y}) -> Switching to MENU")
                     state["mode"] = "MENU"
@@ -2759,7 +2845,7 @@ def main():
         # modes that need high-frequency updates
         needs_high_fps = state["mode"] in ["SNAKE", "GIF_PLAYER", "RANDOM_GIF", "STARTUP", "HEART"] or is_typing_message
         # modes that need low-frequency updates (e.g. once per second or interaction)
-        is_slow_mode = state["mode"] in ["CLOCK", "FOCUS", "ADVANCED_STATS", "MESSAGE_VIEW", "COMPOSE", "SLIDESHOW"] and not is_typing_message
+        is_slow_mode = state["mode"] in ["CLOCK", "FOCUS", "ADVANCED_STATS", "MESSAGE_VIEW", "COMPOSE", "SLIDESHOW", "WIFI_SETUP"] and not is_typing_message
         
         always_update = needs_high_fps or (is_slow_mode and int(now) != int(now - (1/current_fps)))
         
@@ -2768,6 +2854,19 @@ def main():
             if now - state["last_interaction"] > 20:
                 print("Inactivity timeout: Returning to FACE")
                 switch_to_face_mode()
+
+        # Auto-exit WiFi setup when web portal signals completion
+        if state["mode"] == "WIFI_SETUP":
+            if os.path.exists("/tmp/bmo_wifi_setup_done"):
+                print("📡 WiFi setup completed via web portal!")
+                sys.stdout.flush()
+                state["wifi_setup_proc"] = None
+                try: os.remove("/tmp/bmo_wifi_setup_done")
+                except: pass
+                state["mode"] = "MENU"
+                state["menu_stack"] = ["MAIN", "SETTINGS"]
+                state["menu_page"] = 0
+                state["needs_redraw"] = True
         
         # Pop-up Check
         if not state["is_showing_pop_face"] and state["mode"] not in ["FACE", "SNAKE", "STARTUP"]:
@@ -2826,6 +2925,7 @@ def main():
             elif state["mode"] == "MESSAGES": draw_messages_menu(screen)
             elif state["mode"] == "MESSAGE_VIEW": draw_message_view(screen)
             elif state["mode"] == "COMPOSE": draw_compose(screen)
+            elif state["mode"] == "WIFI_SETUP": draw_wifi_setup(screen)
             elif state["mode"] == "SNAKE":
                 state["snake"].draw(screen)
 
