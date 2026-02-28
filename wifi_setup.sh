@@ -85,7 +85,6 @@ dhcp-range=${DHCP_RANGE_START},${DHCP_RANGE_END},255.255.255.0,24h
 address=/connectivitycheck.gstatic.com/${HOTSPOT_IP}
 address=/clients3.google.com/${HOTSPOT_IP}
 address=/connectivitycheck.android.com/${HOTSPOT_IP}
-address=/connectivitycheck.android.com/${HOTSPOT_IP}
 address=/connectivity-check.ubuntu.com/${HOTSPOT_IP}
 address=/detectportal.firefox.com/${HOTSPOT_IP}
 address=/www.apple.com/${HOTSPOT_IP}
@@ -97,8 +96,8 @@ address=/thinkdifferent.us/${HOTSPOT_IP}
 address=/www.msftncsi.com/${HOTSPOT_IP}
 address=/www.msftconnecttest.com/${HOTSPOT_IP}
 
-# Blanket redirect for everything else (as fallback)
-address=/#/${HOTSPOT_IP}
+# Blanket redirect is REMOVED to avoid SSL/HSTS errors on HTTPS domains.
+# Instruct users to visit http://192.168.4.1 manually.
 EOF
 
     # 7. Start hostapd

@@ -2267,35 +2267,38 @@ def draw_wifi_setup(surface):
     surface.blit(title, (WIDTH//2 - title.get_width()//2, 8))
 
     # Instructions
-    y = 70
+    y = 65
     lines = [
         ("1. Connect your phone to WiFi:", WHITE),
         (f"   {hotspot_name}", TEAL),
         ("", WHITE),
-        ("2. Open your browser at:", WHITE),
+        ("2. Open your browser and type:", WHITE),
         ("   http://192.168.4.1", TEAL),
         ("", WHITE),
-        ("3. Configure and save!", WHITE),
+        ("💡 Don't use HTTPS (ssl info)", PINK),
+        ("💡 If errors, type IP manually", PINK),
     ]
     for text, color in lines:
         if text:
-            lbl = FONT_SMALL.render(text, True, color)
-            surface.blit(lbl, (30, y))
-        y += 28
+            # Use smaller font for help tips
+            f = FONT_TINY if text.startswith("💡") else FONT_SMALL
+            lbl = f.render(text, True, color)
+            surface.blit(lbl, (20 if text.startswith("💡") else 30, y))
+        y += 24
 
     # Animated dot indicator
     dot_phase = int(time.time() * 2) % 3
     dots = "." * (dot_phase + 1)
     status_lbl = FONT_TINY.render(f"Waiting for connection{dots}", True, GRAY)
-    surface.blit(status_lbl, (WIDTH//2 - status_lbl.get_width()//2, y + 10))
+    surface.blit(status_lbl, (WIDTH//2 - status_lbl.get_width()//2, y + 5))
 
     # EXIT button (bottom center)
-    btn_y = HEIGHT - 60
-    btn_w, btn_h = 160, 44
+    btn_y = HEIGHT - 55
+    btn_w, btn_h = 160, 40
     btn_x = WIDTH//2 - btn_w//2
     pygame.draw.rect(surface, RED, (btn_x, btn_y, btn_w, btn_h), border_radius=8)
     exit_lbl = FONT_SMALL.render("EXIT SETUP", True, WHITE)
-    surface.blit(exit_lbl, (btn_x + btn_w//2 - exit_lbl.get_width()//2, btn_y + 12))
+    surface.blit(exit_lbl, (btn_x + btn_w//2 - exit_lbl.get_width()//2, btn_y + 10))
 
 def main():
     # singleton check
