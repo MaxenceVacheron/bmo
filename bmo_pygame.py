@@ -2378,6 +2378,7 @@ def main():
                     # If tapping face, toggle interaction UI
                     if WIDTH/4 < x < 3*WIDTH/3 and HEIGHT/4 < y < 3*HEIGHT/4:
                         state["needs"]["show_interaction"] = not state["needs"]["show_interaction"]
+                        continue
                     
                     # Handle interaction buttons if they are shown
                     if state["needs"]["show_interaction"]:
