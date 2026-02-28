@@ -178,10 +178,29 @@ stop_hotspot() {
     echo "  Restarting Docker..." | tee -a "$LOG"
     systemctl start docker 2>>"$LOG" || true
     
-    wpa_supplicant -B -i $INTERFACE -c /etc/wpa_supplicant/wpa_supplicant.conf 2>>"$LOG" || true
+    # Try to connect using nmcli if present (Bookworm)
+    if command -v nmcli >/dev/null 2>&1; then
+        echo "  Attempting to connect via nmcli..." | tee -a "$LOG"
+        nmcli device wifi rescan 2>/dev/null || true
+        # NetworkManager usually picks up wpa_supplicant.conf or has its own profiles
+        # We'll just give it a kick
+        nmcli device connect $INTERFACE 2>>"$LOG" || true
+    fi
+
+    # Fallback to manual wpa_supplicant if needed
+    if ! pgrep wpa_supplicant >/dev/null; then
+        echo "  Starting wpa_supplicant manual fallback..." | tee -a "$LOG"
+        wpa_supplicant -B -i $INTERFACE -c /etc/wpa_supplicant/wpa_supplicant.conf 2>>"$LOG" || true
+    fi
     
-    # Request DHCP
-    dhclient $INTERFACE 2>>"$LOG" || true
+    # Request DHCP or check link
+    if command -v nmcli >/dev/null 2>&1; then
+        echo "  Waiting for NetworkManager connection..." | tee -a "$LOG"
+        timeout 15 nmcli -t -f GENERAL.STATE dev show $INTERFACE | grep -q "connected" || true
+    else
+        echo "  Requesting DHCP..." | tee -a "$LOG"
+        dhclient $INTERFACE 2>>"$LOG" || true
+    fi
 
     echo "✅ Normal WiFi restored." | tee -a "$LOG"
 }

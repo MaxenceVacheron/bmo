@@ -2300,6 +2300,41 @@ def draw_wifi_setup(surface):
     exit_lbl = FONT_SMALL.render("EXIT SETUP", True, WHITE)
     surface.blit(exit_lbl, (btn_x + btn_w//2 - exit_lbl.get_width()//2, btn_y + 10))
 
+def draw_wifi_reconnecting(surface):
+    """Draw WiFi Reconnecting mode screen with status updates"""
+    surface.fill(BLACK)
+    
+    # Title
+    pygame.draw.rect(surface, BLUE, (0, 0, WIDTH, 50))
+    title = FONT_MEDIUM.render("RECONNECTING", True, WHITE)
+    surface.blit(title, (WIDTH//2 - title.get_width()//2, 8))
+
+    # SSID
+    ssid = "New Network"
+    if os.path.exists("/tmp/bmo_last_ssid"):
+        try:
+            with open("/tmp/bmo_last_ssid", "r") as f:
+                ssid = f.read().strip()
+        except: pass
+    
+    y = 80
+    lbl1 = FONT_SMALL.render("Connecting to:", True, WHITE)
+    surface.blit(lbl1, (WIDTH//2 - lbl1.get_width()//2, y))
+    y += 30
+    lbl2 = FONT_MEDIUM.render(ssid, True, TEAL)
+    surface.blit(lbl2, (WIDTH//2 - lbl2.get_width()//2, y))
+    
+    y += 60
+    # Pulsing dot indicator
+    dot_phase = int(time.time() * 2) % 4
+    dots = "." * dot_phase
+    status_lbl = FONT_SMALL.render(f"Please wait{dots}", True, GRAY)
+    surface.blit(status_lbl, (WIDTH//2 - status_lbl.get_width()//2, y))
+    
+    y += 40
+    tip_lbl = FONT_TINY.render("BMO will return once connected", True, PINK)
+    surface.blit(tip_lbl, (WIDTH//2 - tip_lbl.get_width()//2, y))
+
 def main():
     # singleton check
     try:
@@ -2848,7 +2883,7 @@ def main():
         # modes that need high-frequency updates
         needs_high_fps = state["mode"] in ["SNAKE", "GIF_PLAYER", "RANDOM_GIF", "STARTUP", "HEART"] or is_typing_message
         # modes that need low-frequency updates (e.g. once per second or interaction)
-        is_slow_mode = state["mode"] in ["CLOCK", "FOCUS", "ADVANCED_STATS", "MESSAGE_VIEW", "COMPOSE", "SLIDESHOW", "WIFI_SETUP"] and not is_typing_message
+        is_slow_mode = state["mode"] in ["CLOCK", "FOCUS", "ADVANCED_STATS", "MESSAGE_VIEW", "COMPOSE", "SLIDESHOW", "WIFI_SETUP", "WIFI_RECONNECTING"] and not is_typing_message
         
         always_update = needs_high_fps or (is_slow_mode and int(now) != int(now - (1/current_fps)))
         
@@ -2866,6 +2901,32 @@ def main():
                 state["wifi_setup_proc"] = None
                 try: os.remove("/tmp/bmo_wifi_setup_done")
                 except: pass
+                state["mode"] = "WIFI_RECONNECTING"
+                state["wifi_reconnect_start"] = time.time()
+                state["needs_redraw"] = True
+        
+        # Check if WiFi reconnected successfully
+        if state["mode"] == "WIFI_RECONNECTING":
+            # Poll for IP every 2 seconds
+            if now % 2 < 0.1:
+                ip = get_ip_address()
+                # Check if we have a non-hotspot IP
+                if ip and ip != "192.168.4.1" and not ip.startswith("127."):
+                    print(f"📡 WiFi reconnected! IP: {ip}")
+                    sys.stdout.flush()
+                    # Clean up
+                    try: os.remove("/tmp/bmo_last_ssid")
+                    except: pass
+                    # Success feedback
+                    state["mode"] = "MENU"
+                    state["menu_stack"] = ["MAIN"]
+                    state["menu_page"] = 0
+                    state["needs_redraw"] = True
+            
+            # Timeout after 45 seconds
+            if now - state.get("wifi_reconnect_start", now) > 45:
+                print("📡 WiFi reconnection timed out. Returning to menu.")
+                sys.stdout.flush()
                 state["mode"] = "MENU"
                 state["menu_stack"] = ["MAIN", "SETTINGS"]
                 state["menu_page"] = 0
@@ -2929,6 +2990,7 @@ def main():
             elif state["mode"] == "MESSAGE_VIEW": draw_message_view(screen)
             elif state["mode"] == "COMPOSE": draw_compose(screen)
             elif state["mode"] == "WIFI_SETUP": draw_wifi_setup(screen)
+            elif state["mode"] == "WIFI_RECONNECTING": draw_wifi_reconnecting(screen)
             elif state["mode"] == "SNAKE":
                 state["snake"].draw(screen)
 

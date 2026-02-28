@@ -370,12 +370,9 @@ network={{
             with open(NAME_FILE, "w") as f:
                 f.write(device_name.lower())
 
-            # 3. Update messages URL in config if provided
-            if messages_url:
-                config = read_config()
-                config["messages_url"] = messages_url
-                with open(CONFIG_FILE, "w") as f:
-                    json.dump(config, f)
+            # 4. Save last SSID for UI
+            with open("/tmp/bmo_last_ssid", "w") as f:
+                f.write(ssid)
 
             print(f"✅ Config saved: SSID={ssid}, Device={device_name}")
             sys.stdout.flush()
