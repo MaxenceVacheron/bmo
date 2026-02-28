@@ -34,6 +34,12 @@ start_hotspot() {
     systemctl stop dhcpcd 2>>"$LOG" || true
     systemctl stop NetworkManager 2>>"$LOG" || true
     nmcli device set $INTERFACE managed no 2>>"$LOG" || true
+    
+    # Stop Docker to free port 80 (common cause of "C ki ?" prompt)
+    echo "  Stopping Docker to free port 80..." | tee -a "$LOG"
+    systemctl stop docker 2>>"$LOG" || true
+    systemctl stop docker.socket 2>>"$LOG" || true
+    
     systemctl stop dnsmasq 2>>"$LOG" || true
     systemctl stop hostapd 2>>"$LOG" || true
     # Unmask hostapd in case systemd masked it
@@ -167,6 +173,10 @@ stop_hotspot() {
     nmcli device set $INTERFACE managed yes 2>>"$LOG" || true
     systemctl start NetworkManager 2>>"$LOG" || true
     systemctl start dhcpcd 2>>"$LOG" || true
+    
+    # Restart Docker
+    echo "  Restarting Docker..." | tee -a "$LOG"
+    systemctl start docker 2>>"$LOG" || true
     
     wpa_supplicant -B -i $INTERFACE -c /etc/wpa_supplicant/wpa_supplicant.conf 2>>"$LOG" || true
     

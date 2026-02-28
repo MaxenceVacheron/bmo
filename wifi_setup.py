@@ -340,13 +340,17 @@ class SetupHandler(BaseHTTPRequestHandler):
                 raise ValueError("SSID and password are required")
 
             # 1. Write wpa_supplicant.conf (both local template and system)
+            # 64-character hex PSK should not be quoted
+            is_hex_psk = len(password) == 64 and all(c in "0123456789abcdefABCDEF" for c in password)
+            psk_line = f'psk={password}' if is_hex_psk else f'psk="{password}"'
+            
             wpa_content = f"""ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
 update_config=1
 country=FR
 
 network={{
     ssid="{ssid}"
-    psk="{password}"
+    {psk_line}
 
     key_mgmt=WPA-PSK
     scan_ssid=1
