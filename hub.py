@@ -289,32 +289,40 @@ def find_touch_device():
     return "/dev/input/event0"
 
 def touch_thread():
-    try:
-        from evdev import InputDevice, ecodes
-        active_dev = find_touch_device()
-        dev = InputDevice(active_dev)
-        raw_x, raw_y = 0, 0
-        finger_down = False
-        last_finger_state = False
+    """Touch input handler with retry logic for post-execv recovery"""
+    time.sleep(0.5)  # Give evdev a moment after process switch
+    for attempt in range(5):
+        try:
+            from evdev import InputDevice, ecodes
+            active_dev = find_touch_device()
+            print(f"👆 Hub: Opening touch device {active_dev} (attempt {attempt+1})")
+            sys.stdout.flush()
+            dev = InputDevice(active_dev)
+            raw_x, raw_y = 0, 0
+            finger_down = False
+            last_finger_state = False
 
-        for event in dev.read_loop():
-            if event.type == ecodes.EV_ABS:
-                if event.code == ecodes.ABS_X: raw_x = event.value
-                if event.code == ecodes.ABS_Y: raw_y = event.value
-            elif event.type == ecodes.EV_KEY and event.code == ecodes.BTN_TOUCH:
-                finger_down = (event.value == 1)
-            elif event.type == ecodes.EV_SYN and event.code == ecodes.SYN_REPORT:
-                if finger_down and not last_finger_state:
-                    sx = WIDTH - ((raw_y / 4095.0) * WIDTH)
-                    sy = (raw_x / 4095.0) * HEIGHT
-                    pygame.event.post(pygame.event.Event(
-                        pygame.MOUSEBUTTONDOWN,
-                        {'pos': (int(sx), int(sy)), 'button': 1}
-                    ))
-                last_finger_state = finger_down
-    except Exception as e:
-        print(f"Hub Touch Error: {e}")
-        sys.stdout.flush()
+            for event in dev.read_loop():
+                if event.type == ecodes.EV_ABS:
+                    if event.code == ecodes.ABS_X: raw_x = event.value
+                    if event.code == ecodes.ABS_Y: raw_y = event.value
+                elif event.type == ecodes.EV_KEY and event.code == ecodes.BTN_TOUCH:
+                    finger_down = (event.value == 1)
+                elif event.type == ecodes.EV_SYN and event.code == ecodes.SYN_REPORT:
+                    if finger_down and not last_finger_state:
+                        sx = WIDTH - ((raw_y / 4095.0) * WIDTH)
+                        sy = (raw_x / 4095.0) * HEIGHT
+                        pygame.event.post(pygame.event.Event(
+                            pygame.MOUSEBUTTONDOWN,
+                            {'pos': (int(sx), int(sy)), 'button': 1}
+                        ))
+                    last_finger_state = finger_down
+        except Exception as e:
+            print(f"Hub Touch Error (attempt {attempt+1}): {e}")
+            sys.stdout.flush()
+            time.sleep(1)
+    print("❌ Hub: Touch thread gave up after 5 attempts")
+    sys.stdout.flush()
 
 # --- APP SWITCHING ---
 def switch_to_amo():
