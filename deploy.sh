@@ -1,22 +1,32 @@
 #!/bin/bash
-# Deploy BMO code to GitHub and Raspberry Pi
+# Deploy BMO/AMO code to GitHub and Raspberry Pi
 set -e
 
-# Configuration
-# Set to specific IP if needed (e.g. "172.24.13.4"), or leave empty to use "bmo" alias from ssh config
-BMO_IP="10.208.104.4"
-# BMO_IP=""
+# --- TARGET SELECTION ---
+TARGET="${1:-bmo}"
 
-if [ -n "$BMO_IP" ]; then
-    SSH_TARGET="pi@$BMO_IP"
-    GIT_REMOTE_URL="pi@$BMO_IP:/home/pi/bmo"
-else
-    SSH_TARGET="bmo"
-    GIT_REMOTE_URL="pi@bmo:/home/pi/bmo"
-fi
+case "$TARGET" in
+    bmo)
+        DEVICE_IP="10.208.104.4"
+        DEVICE_NAME="BMO"
+        ;;
+    amo)
+        DEVICE_IP="10.208.104.104"
+        DEVICE_NAME="AMO"
+        ;;
+    *)
+        echo "❌ Unknown target: $TARGET"
+        echo "Usage: ./deploy.sh [bmo|amo]"
+        exit 1
+        ;;
+esac
+
+SSH_TARGET="pi@$DEVICE_IP"
+GIT_REMOTE_URL="pi@$DEVICE_IP:/home/pi/bmo"
+GIT_REMOTE_NAME="${TARGET}-device"
 
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-echo "🚀 Starting Deployment of branch [$CURRENT_BRANCH] to $SSH_TARGET..."
+echo "🚀 Starting Deployment of branch [$CURRENT_BRANCH] to $DEVICE_NAME ($SSH_TARGET)..."
 
 # 1. Push to GitHub (Source of Truth)
 echo "☁️ Pushing to GitHub (origin $CURRENT_BRANCH)..."
@@ -24,34 +34,42 @@ git push origin $CURRENT_BRANCH
 
 # 2. Prepare Raspberry Pi (Force Clean)
 echo "🧹 Configuring Raspberry Pi environment..."
-ssh $SSH_TARGET "sudo git config --global --add safe.directory /home/pi/bmo && echo \"pi ALL=(ALL) NOPASSWD: ALL\" | sudo tee /etc/sudoers.d/010_pi-nopasswd && cd /home/pi/bmo && git reset --hard HEAD && git clean -fd"
+ssh $SSH_TARGET "sudo git config --global --add safe.directory /home/pi/bmo && echo \"pi ALL=(ALL) NOPASSWD: ALL\" | sudo tee /etc/sudoers.d/010_pi-nopasswd && if [ ! -d /home/pi/bmo/.git ]; then mkdir -p /home/pi/bmo && cd /home/pi/bmo && git init && git config receive.denyCurrentBranch updateInstead; else cd /home/pi/bmo && git reset --hard HEAD 2>/dev/null; git clean -fd; fi"
 
 # 3. Push to Raspberry Pi
-echo "📲 Pushing to BMO Device..."
+echo "📲 Pushing to $DEVICE_NAME Device..."
 # Ensure remote exists
-if ! git remote | grep -q "^bmo-device$"; then
-    git remote add bmo-device "$GIT_REMOTE_URL"
+if ! git remote | grep -q "^${GIT_REMOTE_NAME}$"; then
+    git remote add "$GIT_REMOTE_NAME" "$GIT_REMOTE_URL"
 else
-    git remote set-url bmo-device "$GIT_REMOTE_URL"
+    git remote set-url "$GIT_REMOTE_NAME" "$GIT_REMOTE_URL"
 fi
-git push bmo-device $CURRENT_BRANCH:main -f
+git push "$GIT_REMOTE_NAME" $CURRENT_BRANCH:main -f
 
-# 4. Restart Service
-echo "🔄 Restarting BMO Service..."
-ssh $SSH_TARGET << 'EOF'
+# 4. Write device identity file, install deps & Restart Service
+echo "🔄 Configuring $DEVICE_NAME identity and restarting service..."
+ssh $SSH_TARGET << EOF
+# Write identity file
+echo "$DEVICE_NAME" > /home/pi/bmo/.name
+
 sudo systemctl stop bmo.service 2>/dev/null || true
 cd /home/pi/bmo
-# Ensure we are on main and up to date (redundant but safe)
-# We push our local branch to remote main for simplicity on the device
+# Ensure we are on main and up to date
 git checkout -f main
 git reset --hard HEAD
+
+# Install Python dependencies if missing
+if ! python3 -c "import pygame" 2>/dev/null; then
+    echo "📦 Installing Python dependencies..."
+    sudo pip3 install pygame Pillow evdev --break-system-packages 2>/dev/null || sudo pip3 install pygame Pillow evdev
+fi
+
 sudo systemctl daemon-reload
 # Sync service files
 sudo cp /home/pi/bmo/bmo.service /etc/systemd/system/bmo.service
-# sudo cp /home/pi/bmo/bmo-mirror.service /etc/systemd/system/bmo-mirror.service
 sudo systemctl daemon-reload
 sudo systemctl restart bmo.service
-echo "✅ Service restarted!"
+echo "✅ $DEVICE_NAME Service restarted!"
 
 # Update WiFi Config if present
 if [ -f "/home/pi/bmo/wpa_supplicant.conf" ]; then
@@ -81,6 +99,6 @@ echo "✅ Cron jobs installed (Every minute + On Boot)!"
 
 EOF
 
-echo "🎉 Deployment Complete!"
+echo "🎉 $DEVICE_NAME Deployment Complete!"
 echo "📋 Tailing logs (Ctrl+C to stop)..."
 ssh $SSH_TARGET "sudo journalctl -u bmo.service -f -n 50"

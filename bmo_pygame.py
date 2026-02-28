@@ -15,9 +15,21 @@ import subprocess
 import base64
 from games.snake import SnakeGame
 
+# --- DEVICE IDENTITY ---
+def _read_device_name():
+    try:
+        with open("/home/pi/bmo/.name", "r") as f:
+            return f.read().strip().upper()
+    except:
+        return "BMO"  # Default fallback
+
+DEVICE_NAME = _read_device_name()
+# The "other" device for messaging
+OTHER_DEVICE = "AMO" if DEVICE_NAME == "BMO" else "BMO"
+
 # --- CONFIGURATION ---
 WIDTH, HEIGHT = 480, 320
-FB_DEVICE = "/dev/fb1"
+FB_DEVICE = "/dev/fb1" if os.path.exists("/dev/fb1") else "/dev/fb0"
 TOUCH_DEVICE = "/dev/input/event4" # SPI-connected touch panel on CS1
 NEXTCLOUD_PATH = "/home/pi/mnt/nextcloud/shr/BMO_Agnes"
 CONFIG_FILE = "/home/pi/bmo/bmo_config.json"
@@ -63,7 +75,6 @@ screen = pygame.Surface((WIDTH, HEIGHT), depth=16, masks=(0xF800, 0x07E0, 0x001F
 # Colors
 BLACK = (20, 24, 28)
 WHITE = (245, 247, 250)
-TEAL = (165, 215, 185) # Paler, minty teal for the screen face
 PINK = (255, 148, 178)
 YELLOW = (241, 196, 15)
 RED = (231, 76, 60)
@@ -72,6 +83,12 @@ GREEN = (46, 204, 113)
 GREEN_MOUTH = (39, 174, 96) # For the big smile
 GRAY = (127, 140, 141)
 ORANGE = (230, 126, 34)
+
+# Device-specific accent color
+if DEVICE_NAME == "AMO":
+    TEAL = (178, 132, 220)  # Purple for AMO
+else:
+    TEAL = (165, 215, 185)  # Paler, minty teal for BMO
 
 # Fonts
 try:
@@ -92,7 +109,7 @@ stats = {"cpu_temp": 0, "ram_usage": 0, "last_update": 0}
 
 LOVE_NOTES = [
     "You are amazing!",
-    "BMO loves you! <3",
+    f"{DEVICE_NAME} loves you! <3",
     "Have a great day!",
     "You're my favorite!",
     "I'm happy to be yours!",
@@ -118,7 +135,7 @@ T9_MAPPING = {
     '0': ' 0'
 }
 T9_DICT = {} # Loaded dynamically
-T9_COMMON_WORDS = ["salut", "cc", "ca va", "oui", "non", "bisous", "ok", "merci", "je", "tu", "il", "elle", "nous", "vous", "ils", "elles", "le", "la", "les", "un", "une", "des", "et", "ou", "mais", "donc", "or", "ni", "car", "a", "bof", "super", "cool", "lol", "mdr", "bmo", "agnes", "maxence", "love", "bisou", "miam", "dodo", "faim", "soif", "calin", "je t'aime", "trop bien", "bonjour", "bonsoir", "nuit", "demain", "aujourd'hui", "hier", "plus", "moins", "bien", "mal", "tout", "rien", "jamais", "toujours", "vite", "lent", "grand", "petit", "gros", "mince", "beau", "belle", "moche", "gentil", "mechant", "drole", "triste", "heureux", "malheureux", "fatigue", "enerve", "calme", "stress", "boulo", "travail", "maison", "ecole", "voiture", "velo", "bus", "train", "avion", "bateau", "motos", "rue", "route", "chemin", "ville", "campagne", "mer", "montagne", "foret", "parc", "jardin", "fleur", "arbre", "soleil", "lune", "etoile", "ciel", "nuage", "pluie", "neige", "vent", "orage", "tempete", "chaud", "froid", "tied", "sec", "mouille", "propre", "sale", "vide", "plein", "haut", "bas", "gauche", "droite", "devant", "derriere", "pres", "loin", "ici", "la", "ailleurs", "partout", "nulle part", "quelque part", "quelqu'un", "personne", "tout le monde", "rien du tout", "tout a fait", "pas du tout", "peut-etre", "surement", "certainement", "absolument", "vraiment", "totalement", "completement", "exactement", "precisement", "environ", "presque", "a peu pres", "grosso modo", "en gros", "en bref", "en resume", "en conclusion", "enfin", "finalement", "bref"]
+T9_COMMON_WORDS = ["salut", "cc", "ca va", "oui", "non", "bisous", "ok", "merci", "je", "tu", "il", "elle", "nous", "vous", "ils", "elles", "le", "la", "les", "un", "une", "des", "et", "ou", "mais", "donc", "or", "ni", "car", "a", "bof", "super", "cool", "lol", "mdr", DEVICE_NAME.lower(), "agnes", "maxence", "love", "bisou", "miam", "dodo", "faim", "soif", "calin", "je t'aime", "trop bien", "bonjour", "bonsoir", "nuit", "demain", "aujourd'hui", "hier", "plus", "moins", "bien", "mal", "tout", "rien", "jamais", "toujours", "vite", "lent", "grand", "petit", "gros", "mince", "beau", "belle", "moche", "gentil", "mechant", "drole", "triste", "heureux", "malheureux", "fatigue", "enerve", "calme", "stress", "boulo", "travail", "maison", "ecole", "voiture", "velo", "bus", "train", "avion", "bateau", "motos", "rue", "route", "chemin", "ville", "campagne", "mer", "montagne", "foret", "parc", "jardin", "fleur", "arbre", "soleil", "lune", "etoile", "ciel", "nuage", "pluie", "neige", "vent", "orage", "tempete", "chaud", "froid", "tied", "sec", "mouille", "propre", "sale", "vide", "plein", "haut", "bas", "gauche", "droite", "devant", "derriere", "pres", "loin", "ici", "la", "ailleurs", "partout", "nulle part", "quelque part", "quelqu'un", "personne", "tout le monde", "rien du tout", "tout a fait", "pas du tout", "peut-etre", "surement", "certainement", "absolument", "vraiment", "totalement", "completement", "exactement", "precisement", "environ", "presque", "a peu pres", "grosso modo", "en gros", "en bref", "en resume", "en conclusion", "enfin", "finalement", "bref"]
 
 def load_t9_dictionary():
     """Load dictionary words for T9 prediction"""
@@ -279,7 +296,7 @@ state = {
         "next_heart_time": time.time() + 300 # Random Heart every 5-10 mins
     },
     "startup": {
-        "message": "Hello Agnès! I'm BMO. Maxence built my brain just for you.",
+        "message": f"Hello! I'm {DEVICE_NAME}. Maxence built my brain just for you.",
         "char_index": 0,
         "start_time": 0,
         "char_delay": 0.05  # 50ms per character
@@ -438,7 +455,7 @@ def sync_messages():
         sys.stdout.flush()
         
         # HTTP Basic Auth
-        auth = base64.b64encode(b"BMO:BMO").decode("ascii")
+        auth = base64.b64encode(f"{DEVICE_NAME}:{DEVICE_NAME}".encode()).decode("ascii")
         headers = {"Authorization": f"Basic {auth}"}
         
         req = urllib.request.Request(MESSAGES_URL, headers=headers)
@@ -458,8 +475,8 @@ def sync_messages():
                         if not m.get("read", False):
                             state["messages"]["unread"] = True
                         
-                        # Only flag as added if it is NOT from BMO
-                        if m.get("sender") != "BMO":
+                        # Only flag as added if it is NOT from this device
+                        if m.get("sender") != DEVICE_NAME:
                             new_incoming = True
                         
                         added = True
@@ -516,7 +533,7 @@ def send_read_receipt(msg_id):
         req = urllib.request.Request(READ_RECEIPT_URL, data=data, method='POST')
         req.add_header('Content-Type', 'application/json')
         # HTTP Basic Auth for Read Receipt
-        auth = base64.b64encode(b"BMO:BMO").decode("ascii")
+        auth = base64.b64encode(f"{DEVICE_NAME}:{DEVICE_NAME}".encode()).decode("ascii")
         req.add_header('Authorization', f"Basic {auth}")
         
         with urllib.request.urlopen(req, timeout=5) as response:
@@ -605,7 +622,7 @@ def get_wifi_strength():
 def draw_advanced_stats(screen):
     screen.fill(GRAY)
     
-    title = FONT_MEDIUM.render("BMO SYSTEM STATUS", True, WHITE)
+    title = FONT_MEDIUM.render(f"{DEVICE_NAME} SYSTEM STATUS", True, WHITE)
     pygame.draw.rect(screen, BLACK, (0, 0, WIDTH, 50))
     screen.blit(title, (WIDTH//2 - title.get_width()//2, 10))
     
@@ -656,9 +673,9 @@ def draw_advanced_stats(screen):
 
 def auto_update_and_restart():
     """Pull latest changes from Git and restart the service"""
-    print("🚀 BMO Auto-Update triggered!")
+    print(f"🚀 {DEVICE_NAME} Auto-Update triggered!")
     screen.fill(BLACK)
-    lbl = FONT_MEDIUM.render("UPDATING BMO...", True, WHITE)
+    lbl = FONT_MEDIUM.render(f"UPDATING {DEVICE_NAME}...", True, WHITE)
     screen.blit(lbl, (WIDTH//2 - lbl.get_width()//2, HEIGHT//2 - 20))
     
     # Write to framebuffer directly for immediate feedback
@@ -1651,7 +1668,7 @@ def draw_menu(screen):
     title_font = FONT_SMALL if is_submenu else FONT_MEDIUM
     
     pygame.draw.rect(screen, BLACK, (0, 0, WIDTH, banner_height))
-    title = title_font.render(f"BMO MENU: {current_menu_id}", True, WHITE)
+    title = title_font.render(f"{DEVICE_NAME} MENU: {current_menu_id}", True, WHITE)
     screen.blit(title, (WIDTH//2 - title.get_width()//2, (banner_height - title.get_height())//2))
     
     # Pagination Logic (2x2 Grid = 4 items per page)
@@ -1776,12 +1793,12 @@ def draw_notes(screen):
 def draw_messages_menu(screen):
     screen.fill(PINK)
     pygame.draw.rect(screen, BLACK, (0, 0, WIDTH, 50))
-    title = FONT_MEDIUM.render("BMO INBOX", True, WHITE)
+    title = FONT_MEDIUM.render(f"{DEVICE_NAME} INBOX", True, WHITE)
     screen.blit(title, (WIDTH//2 - title.get_width()//2, 10))
     
     all_msgs = state["messages"]["list"]
-    # Filter out messages sent by BMO
-    msgs = [m for m in all_msgs if m.get("sender") != "BMO"]
+    # Filter out messages sent by this device
+    msgs = [m for m in all_msgs if m.get("sender") != DEVICE_NAME]
     
     if not msgs:
         lbl = FONT_SMALL.render("No messages yet!", True, BLACK)
@@ -2130,7 +2147,7 @@ def update_t9_candidates():
     if buf in T9_DICT:
         state["compose"]["candidates"] = T9_DICT[buf][:5]
 
-def send_message(text, recipient="AMO"):
+def send_message(text, recipient=OTHER_DEVICE):
     """Send message to API"""
     try:
         print(f"📤 Sending to {recipient}: {text}")
@@ -2138,14 +2155,14 @@ def send_message(text, recipient="AMO"):
         
         data = json.dumps({
             "content": text,
-            "sender": "BMO",
+            "sender": DEVICE_NAME,
             "recipient": recipient,
             "timestamp": int(time.time())
         }).encode('utf-8')
         
         req = urllib.request.Request(MESSAGES_URL + "/send", data=data, method='POST')
         req.add_header('Content-Type', 'application/json')
-        auth = base64.b64encode(b"BMO:BMO").decode("ascii")
+        auth = base64.b64encode(f"{DEVICE_NAME}:{DEVICE_NAME}".encode()).decode("ascii")
         req.add_header('Authorization', f"Basic {auth}")
         
         with urllib.request.urlopen(req, timeout=10) as response:
@@ -2241,9 +2258,9 @@ def main():
     # singleton check
     try:
         lock_socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-        lock_socket.bind('\0bmo_instance_lock')
+        lock_socket.bind(f'\0{DEVICE_NAME.lower()}_instance_lock')
     except socket.error:
-        print("BMO is already running!")
+        print(f"{DEVICE_NAME} is already running!")
         sys.exit(0)
 
     # Load Config
@@ -2611,7 +2628,7 @@ def main():
                             state["menu_page"] -= 1
                         elif x > WIDTH - 100:
                             # Use filtered list for pagination check
-                            filtered_msgs = [m for m in state["messages"]["list"] if m.get("sender") != "BMO"]
+                            filtered_msgs = [m for m in state["messages"]["list"] if m.get("sender") != DEVICE_NAME]
                             if len(filtered_msgs) > (state["menu_page"] + 1) * 4:
                                 print("🔘 Messages Click: NEXT PAGE")
                                 state["menu_page"] += 1
@@ -2624,7 +2641,7 @@ def main():
                         idx = (y - 60) // 55
                         real_idx = (state["menu_page"] * 4) + int(idx)
                         
-                        filtered_msgs = [m for m in state["messages"]["list"] if m.get("sender") != "BMO"]
+                        filtered_msgs = [m for m in state["messages"]["list"] if m.get("sender") != DEVICE_NAME]
                         
                         if real_idx < len(filtered_msgs):
                             msg = filtered_msgs[real_idx]
