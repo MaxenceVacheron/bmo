@@ -1,6 +1,6 @@
 [Unit]
 Description=BMO Companion Service
-After=network.target
+After=local-fs.target
 
 [Service]
 ExecStart=/usr/bin/python3 /home/pi/bmo/bmo_pygame.py
