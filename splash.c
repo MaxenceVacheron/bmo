@@ -12,10 +12,10 @@ int main(int argc, char *argv[]) {
 
     // Wait for /dev/fb1 to appear (up to 30s)
     int fd = -1;
-    for (int i = 0; i < 60; i++) {
+    for (int i = 0; i < 300; i++) { // 30s / 0.1s = 300 iterations
         fd = open("/dev/fb1", O_RDWR);
         if (fd >= 0) break;
-        usleep(500000); // 500ms
+        usleep(100000); // 100ms
     }
 
     if (fd < 0) {

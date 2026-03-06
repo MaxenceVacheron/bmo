@@ -1,0 +1,12 @@
+[Unit]
+Description=BMO Nextcloud Background Sync
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/rclone copy NextCloud: /home/pi/bmo/nextcloud_cache --vfs-cache-mode full --ignore-existing --size-only
+User=pi
+Group=pi
+
+[Install]
+WantedBy=multi-user.target

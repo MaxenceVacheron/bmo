@@ -40,7 +40,7 @@ def _get_fb_device():
 
 FB_DEVICE = _get_fb_device()
 TOUCH_DEVICE = "/dev/input/event4" # SPI-connected touch panel on CS1
-NEXTCLOUD_PATH = "/home/pi/mnt/nextcloud/shr/BMO_Agnes"
+NEXTCLOUD_PATH = "/home/pi/bmo/nextcloud_cache/shr/BMO_Agnes"
 CONFIG_FILE = "/home/pi/bmo/bmo_config.json"
 BMO_FACES_ROOT = "/home/pi/bmo/bmo_faces"
 IDLE_THOUGHT_DIR = "/home/pi/bmo/bmo_assets/idle/thought"

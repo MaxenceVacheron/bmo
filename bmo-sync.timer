@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for BMO Nextcloud Sync
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+Unit=bmo-sync.service
+
+[Install]
+WantedBy=timers.target
