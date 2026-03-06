@@ -29,7 +29,16 @@ OTHER_DEVICE = "AMO" if DEVICE_NAME == "BMO" else "BMO"
 
 # --- CONFIGURATION ---
 WIDTH, HEIGHT = 480, 320
-FB_DEVICE = "/dev/fb1" if os.path.exists("/dev/fb1") else "/dev/fb0"
+
+def _get_fb_device():
+    # Wait for /dev/fb1 to appear (up to 30s)
+    for _ in range(60):
+        if os.path.exists("/dev/fb1"):
+            return "/dev/fb1"
+        time.sleep(0.5)
+    return "/dev/fb1" if os.path.exists("/dev/fb1") else "/dev/fb0"
+
+FB_DEVICE = _get_fb_device()
 TOUCH_DEVICE = "/dev/input/event4" # SPI-connected touch panel on CS1
 NEXTCLOUD_PATH = "/home/pi/mnt/nextcloud/shr/BMO_Agnes"
 CONFIG_FILE = "/home/pi/bmo/bmo_config.json"
