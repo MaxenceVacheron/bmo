@@ -1,0 +1,14 @@
+[Unit]
+Description=BMO Early Splash Screen
+DefaultDependencies=no
+After=local-fs.target
+Before=bmo.service
+
+[Service]
+Type=oneshot
+ExecStart=/home/pi/bmo/splash /home/pi/bmo/splash.raw
+RemainAfterExit=yes
+User=root
+
+[Install]
+WantedBy=sysinit.target

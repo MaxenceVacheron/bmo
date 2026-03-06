@@ -7,11 +7,11 @@ TARGET="${1:-bmo}"
 
 case "$TARGET" in
     bmo)
-        DEVICE_IP="10.208.104.4"
+        DEVICE_IP="10.132.14.4"
         DEVICE_NAME="BMO"
         ;;
     amo)
-        DEVICE_IP="10.208.104.104"
+        DEVICE_IP="10.132.14.104"
         DEVICE_NAME="AMO"
         ;;
     *)

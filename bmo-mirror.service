@@ -1,6 +1,7 @@
 [Unit]
 Description=BMO Framebuffer Mirror (Desktop to SPI)
-After=display-manager.service
+After=local-fs.target
+DefaultDependencies=no
 
 [Service]
 ExecStart=/home/pi/bmo/mirror
