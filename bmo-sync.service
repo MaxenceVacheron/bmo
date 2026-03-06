@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/rclone copy NextCloud: /home/pi/bmo/nextcloud_cache --vfs-cache-mode full --ignore-existing --size-only
+ExecStart=/usr/bin/rclone copy NextCloud: /home/pi/bmo/nextcloud_cache --transfers 4 --checkers 8
 User=pi
 Group=pi
 
