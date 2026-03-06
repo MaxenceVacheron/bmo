@@ -297,7 +297,7 @@ state = {
         "next_heart_time": time.time() + 300 # Random Heart every 5-10 mins
     },
     "startup": {
-        "message": f"Hello! I'm {DEVICE_NAME}. Maxence built my brain just for you.",
+        "message": f"Hello Agnès! I'm {DEVICE_NAME}. Maxence built my brain just for you.",
         "char_index": 0,
         "start_time": 0,
         "char_delay": 0.05  # 50ms per character

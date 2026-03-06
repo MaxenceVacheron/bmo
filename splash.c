@@ -10,9 +10,16 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    int fd = open("/dev/fb1", O_RDWR);
+    // Wait for /dev/fb1 to appear (up to 30s)
+    int fd = -1;
+    for (int i = 0; i < 60; i++) {
+        fd = open("/dev/fb1", O_RDWR);
+        if (fd >= 0) break;
+        usleep(500000); // 500ms
+    }
+
     if (fd < 0) {
-        perror("Error opening /dev/fb1");
+        perror("Error opening /dev/fb1 (timed out)");
         return 1;
     }
 
