@@ -363,7 +363,9 @@ state = {
         "play": 70.0,
         "last_decay": time.time(),
         "hearts": [], # Floating hearts: {"pos": [x,y], "vel": [vx,vy], "life": t}
-        "show_interaction": False # Whether to show feeding/playing buttons
+        "show_interaction": False, # Whether to show feeding/playing buttons
+        "zero_since": 0, # Timestamp when a need first hit zero
+        "negative_delay": 0 # Random delay before switching to negative
     },
     "click_feedback": {
         "pos": (0, 0),
@@ -1417,13 +1419,24 @@ def update_face():
         state["needs"]["last_decay"] = now
         
         # Update Emotion based on needs
-        avg = (state["needs"]["hunger"] + state["needs"]["play"] + state["needs"]["energy"]) / 3.0
-        if avg < 40:
-            if state["emotion"] != "negative":
+        any_zero = (state["needs"]["hunger"] <= 0 or state["needs"]["play"] <= 0 or state["needs"]["energy"] <= 0)
+        
+        if any_zero:
+            if state["needs"]["zero_since"] == 0:
+                # First time a need hit zero, set the timestamp and random delay
+                state["needs"]["zero_since"] = now
+                state["needs"]["negative_delay"] = random.uniform(900, 3600) # 15 to 60 minutes
+                print(f"Need hit zero! Negative emotion delayed by {state['needs']['negative_delay']/60:.1f} mins")
+            
+            # Check if delay has passed
+            if state["emotion"] != "negative" and (now - state["needs"]["zero_since"]) >= state["needs"]["negative_delay"]:
                 state["emotion"] = "negative"
-                print("BMO feels sad/neglected...")
+                print("BMO feels sad/neglected (delay expired)...")
                 load_random_face()
-        elif avg > 60:
+        else:
+            # Everything is fine, reset timers and emotion if needed
+            state["needs"]["zero_since"] = 0
+            state["needs"]["negative_delay"] = 0
             if state["emotion"] != "positive":
                 state["emotion"] = "positive"
                 print("BMO feels happy and cared for!")
