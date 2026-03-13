@@ -1216,11 +1216,11 @@ def switch_to_face_mode(emotion="positive"):
 
 # --- FACE IMAGE MANAGEMENT ---
 def load_random_face(emotion=None):
-    """Load a random face pair. If emotion is None, uses 20% negative chance."""
+    """Load a random face pair. If emotion is None, uses current state emotion."""
     
-    # 20% chance for negative if not forced
+    # 5% chance for negative if not forced
     if emotion is None:
-        emotion = "negative" if random.random() < 0.2 else "positive"
+        emotion = "negative" if random.random() < 0.05 else "positive"
     
     # Check if target emotion directory has images, fallback if needed
     open_dir = os.path.join(BMO_FACES_ROOT, emotion, "open")
@@ -1413,9 +1413,9 @@ def update_face():
         # Hunger: 100% in 15h -> 0.11% / min
         # Play: 100% in 10h -> 0.16% / min
         # Energy: 100% in 20h -> 0.08% / min
-        state["needs"]["hunger"] = max(0, state["needs"]["hunger"] - (0.11 * elapsed_mins))
-        state["needs"]["play"] = max(0, state["needs"]["play"] - (0.16 * elapsed_mins))
-        state["needs"]["energy"] = max(0, state["needs"]["energy"] - (0.08 * elapsed_mins))
+        state["needs"]["hunger"] = max(0, state["needs"]["hunger"] - (2 * elapsed_mins))
+        state["needs"]["play"] = max(0, state["needs"]["play"] - (1.8 * elapsed_mins))
+        state["needs"]["energy"] = max(0, state["needs"]["energy"] - (1.6 * elapsed_mins)) # 1 hour to empty
         state["needs"]["last_decay"] = now
         
         # Update Emotion based on needs
