@@ -627,73 +627,65 @@ def get_wifi_strength():
         res = subprocess.check_output(['iwconfig', 'wlan0']).decode('utf-8')
         for line in res.split('\n'):
             if "Link Quality" in line:
-                part = line.split("Link Quality=")[1].split()[0]
-                q, t = map(int, part.split('/'))
-                return (q / t) * 100
-    except:
         pass
     return 0
 
 def draw_advanced_stats(screen):
     screen.fill(GRAY)
     
+    # Constants for layout
+    COL1 = 40
+    COL2 = 240
+    
     title = FONT_MEDIUM.render(f"{DEVICE_NAME} SYSTEM STATUS", True, WHITE)
     pygame.draw.rect(screen, BLACK, (0, 0, WIDTH, 50))
     screen.blit(title, (WIDTH//2 - title.get_width()//2, 10))
     
-    y = 70
+    # Line 1: IP & Server Status
+    y = 60
     ip = get_ip_address()
-    lbl = FONT_SMALL.render(f"IP: {ip}", True, BLACK)
-    screen.blit(lbl, (40, y))
+    lbl_ip = FONT_TINY.render(f"IP: {ip}", True, BLACK)
+    screen.blit(lbl_ip, (COL1, y))
     
-    y += 40
-    wifi = get_wifi_strength()
-    lbl = FONT_SMALL.render(f"WIFI SIGNAL: {wifi:.0f}%", True, BLACK)
-    screen.blit(lbl, (40, y))
-    pygame.draw.rect(screen, BLACK, (40, y+30, 400, 20), 2)
-    w = int(396 * (wifi / 100.0))
-    if wifi > 0:
-        color = GREEN if wifi > 50 else YELLOW
-        pygame.draw.rect(screen, color, (42, y+32, w, 16))
-    
-    y += 70
-    temp = get_cpu_temp()
-    lbl = FONT_SMALL.render(f"CPU TEMP: {temp:.1f}C", True, BLACK)
-    screen.blit(lbl, (40, y))
-    pygame.draw.rect(screen, BLACK, (40, y+30, 400, 20), 2)
-    w = int(396 * (min(temp, 85) / 85.0))
-    color = RED if temp > 65 else GREEN
-    pygame.draw.rect(screen, color, (42, y+32, w, 16))
-    
-    y += 70
-    ram_p, ram_f = get_ram_usage()
-    lbl = FONT_SMALL.render(f"RAM: {ram_p:.1f}% ({ram_f:.1f} GB Free)", True, BLACK)
-    screen.blit(lbl, (40, y))
-    pygame.draw.rect(screen, BLACK, (40, y+30, 400, 20), 2)
-    w = int(396 * (ram_p / 100.0))
-    pygame.draw.rect(screen, ORANGE, (42, y+32, w, 16))
-    
-    y += 70
-    disk_p, disk_f = get_disk_usage()
-    lbl = FONT_SMALL.render(f"DISK: {disk_p:.1f}% ({disk_f:.1f} GB Free)", True, BLACK)
-    screen.blit(lbl, (40, y))
-    pygame.draw.rect(screen, BLACK, (40, y+30, 400, 20), 2)
-    w = int(396 * (disk_p / 100.0))
-    pygame.draw.rect(screen, BLUE, (42, y+32, w, 16))
-
-    y += 70
-    fps_val = state.get("face_target_fps", 30)
-    lbl = FONT_SMALL.render(f"FACE FPS TARGET: {fps_val}", True, BLACK)
-    screen.blit(lbl, (40, y))
-
-    y += 40
     sync_ok = state["messages"].get("last_sync_ok", False)
     status_text = "OK" if sync_ok else "ERROR"
     status_color = GREEN if sync_ok else RED
-    lbl = FONT_SMALL.render(f"MESSAGE SERVER: ", True, BLACK)
-    status_lbl = FONT_SMALL.render(status_text, True, status_color)
-    screen.blit(lbl, (40, y))
-    screen.blit(status_lbl, (40 + lbl.get_width(), y))
+    lbl_srv = FONT_TINY.render("SERVER: ", True, BLACK)
+    val_srv = FONT_TINY.render(status_text, True, status_color)
+    screen.blit(lbl_srv, (COL2, y))
+    screen.blit(val_srv, (COL2 + lbl_srv.get_width(), y))
+    
+    # Stats with bars
+    def draw_stat_bar(y_pos, label, value_p, value_text, color):
+        lbl = FONT_TINY.render(label, True, BLACK)
+        val = FONT_TINY.render(value_text, True, BLACK)
+        screen.blit(lbl, (COL1, y_pos))
+        screen.blit(val, (WIDTH - val.get_width() - 40, y_pos))
+        
+        # Bar
+        pygame.draw.rect(screen, BLACK, (COL1, y_pos + 20, 400, 15), 2)
+        w = int(396 * (min(value_p, 100) / 100.0))
+        if w > 0:
+            pygame.draw.rect(screen, color, (COL1 + 2, y_pos + 22, w, 11))
+        return y_pos + 45
+
+    y = 85
+    wifi = get_wifi_strength()
+    y = draw_stat_bar(y, "WIFI SIGNAL", wifi, f"{wifi:.0f}%", GREEN if wifi > 50 else YELLOW)
+    
+    temp = get_cpu_temp()
+    y = draw_stat_bar(y, "CPU TEMP", (temp/85.0)*100, f"{temp:.1f}C", RED if temp > 65 else GREEN)
+    
+    ram_p, ram_f = get_ram_usage()
+    y = draw_stat_bar(y, "RAM USAGE", ram_p, f"{ram_p:.1f}% ({ram_f:.1f}G Free)", ORANGE)
+    
+    disk_p, disk_f = get_disk_usage()
+    y = draw_stat_bar(y, "DISK USAGE", disk_p, f"{disk_p:.1f}% ({disk_f:.1f}G Free)", BLUE)
+
+    # Footer
+    fps_val = state.get("face_target_fps", 30)
+    lbl_fps = FONT_TINY.render(f"FACE FPS TARGET: {fps_val}", True, BLACK)
+    screen.blit(lbl_fps, (COL1, y + 5))
 
 def auto_update_and_restart():
     """Pull latest changes from Git and restart the service"""
