@@ -627,6 +627,10 @@ def get_wifi_strength():
         res = subprocess.check_output(['iwconfig', 'wlan0']).decode('utf-8')
         for line in res.split('\n'):
             if "Link Quality" in line:
+                part = line.split("Link Quality=")[1].split()[0]
+                q, t = map(int, part.split('/'))
+                return (q / t) * 100
+    except:
         pass
     return 0
 
@@ -1222,9 +1226,9 @@ def switch_to_face_mode(emotion="positive"):
 def load_random_face(emotion=None):
     """Load a random face pair. If emotion is None, uses current state emotion."""
     
-    # 5% chance for negative if not forced
+    # Use the current emotion state (controlled by needs system)
     if emotion is None:
-        emotion = "negative" if random.random() < 0.05 else "positive"
+        emotion = state.get("emotion", "positive")
     
     # Check if target emotion directory has images, fallback if needed
     open_dir = os.path.join(BMO_FACES_ROOT, emotion, "open")
@@ -1429,7 +1433,7 @@ def update_face():
             if state["needs"]["zero_since"] == 0:
                 # First time a need hit zero, set the timestamp and random delay
                 state["needs"]["zero_since"] = now
-                state["needs"]["negative_delay"] = random.uniform(900, 3600) # 15 to 60 minutes
+                state["needs"]["negative_delay"] = random.uniform(10, 120) # 15 to 60 minutes
                 print(f"Need hit zero! Negative emotion delayed by {state['needs']['negative_delay']/60:.1f} mins")
             
             # Check if delay has passed
