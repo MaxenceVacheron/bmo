@@ -384,7 +384,8 @@ state = {
         "viewing_id": None,
         "view_start_time": 0,
         "deleted_ids": [],
-        "show_confirm_delete": False
+        "show_confirm_delete": False,
+        "last_sync_ok": True # Track if last fetch was successful
     },
     "compose": {
         "text": "",
@@ -526,9 +527,11 @@ def sync_messages():
                         # Trigger Flash in separate thread
                         threading.Thread(target=flash_screen, daemon=True).start()
                     
+                state["messages"]["last_sync_ok"] = True
                 return True
     except Exception as e:
         print(f"Sync Error: {e}")
+        state["messages"]["last_sync_ok"] = False
         sys.stdout.flush()
     return False
 
@@ -682,6 +685,15 @@ def draw_advanced_stats(screen):
     fps_val = state.get("face_target_fps", 30)
     lbl = FONT_SMALL.render(f"FACE FPS TARGET: {fps_val}", True, BLACK)
     screen.blit(lbl, (40, y))
+
+    y += 40
+    sync_ok = state["messages"].get("last_sync_ok", False)
+    status_text = "OK" if sync_ok else "ERROR"
+    status_color = GREEN if sync_ok else RED
+    lbl = FONT_SMALL.render(f"MESSAGE SERVER: ", True, BLACK)
+    status_lbl = FONT_SMALL.render(status_text, True, status_color)
+    screen.blit(lbl, (40, y))
+    screen.blit(status_lbl, (40 + lbl.get_width(), y))
 
 def auto_update_and_restart():
     """Pull latest changes from Git and restart the service"""
