@@ -212,3 +212,6 @@ __marimo__/
 # Legacy BMO specific
 bmo_config.json
 messages.json
+
+# Nextcloud Cache (local to device)
+nextcloud_cache/
