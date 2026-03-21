@@ -316,7 +316,7 @@ state = {
             "notes": []
         },
         "next_heart_time": time.time() + 300, # Random Heart every 5-10 mins
-        "next_gif_time": time.time() + 120    # Pre-initialize GIF timer (2 min after start)
+        "next_gif_time": time.time() + 60    # Pre-initialize GIF timer (1 min after start)
     },
     "startup": {
         "message": f"Hello Agnès! I'm {DEVICE_NAME}. Maxence built my brain just for you.",
@@ -1534,8 +1534,8 @@ def update_face():
         if now > state["idle"].get("next_gif_time", 0):
             print("🎲 Periodic Random GIF Triggered!")
             trigger_random_gif()
-            # Schedule next one in 10-20 minutes
-            state["idle"]["next_gif_time"] = now + random.uniform(600, 1200)
+            # Schedule next one in 1-6 minutes
+            state["idle"]["next_gif_time"] = now + random.uniform(60, 360)
             state["needs_redraw"] = True
             sys.stdout.flush()
             return
