@@ -953,18 +953,20 @@ def start_gif_player(subdir):
     
     if not state["gif_player"]["gifs"]:
         print(f"⚠️ No GIFs found in {path}")
-        # Try a recursive search as a last resort if the specific subdir/Photos/GIFs is missing
-        print(f"🔍 Attempting recursive search in {NEXTCLOUD_PATH}...")
+        # Try a wider recursive search as a last resort
+        wide_path = "/home/pi/bmo/nextcloud_cache"
+        print(f"🔍 Attempting wide recursive search in {wide_path}...")
         try:
-            for root, dirs, files in os.walk(NEXTCLOUD_PATH):
-                for f in files:
-                    if f.lower().endswith('.gif'):
-                        state["gif_player"]["gifs"].append(os.path.join(root, f))
+            if os.path.exists(wide_path):
+                for root, dirs, files in os.walk(wide_path):
+                    for f in files:
+                        if f.lower().endswith('.gif'):
+                            state["gif_player"]["gifs"].append(os.path.join(root, f))
         except Exception as e:
-            print(f"Recursive search error: {e}")
+            print(f"Wide recursive search error: {e}")
 
     if not state["gif_player"]["gifs"]:
-        print(f"❌ Still no GIFs found after recursive search in {NEXTCLOUD_PATH}")
+        print(f"❌ Still no GIFs found after wide recursive search")
         state["mode"] = "MENU"
         return
     
@@ -980,13 +982,20 @@ def trigger_random_gif():
     """Select and play a random GIF for a short time"""
     all_gifs = []
     all_gifs = []
-    # Scan recursively for GIFs in Nextcloud path
+    # Scan recursively for GIFs in Nextcloud path and its parent
+    wide_path = "/home/pi/bmo/nextcloud_cache"
     try:
-        if os.path.exists(NEXTCLOUD_PATH):
-            for root, dirs, files in os.walk(NEXTCLOUD_PATH):
-                for f in files:
-                    if f.lower().endswith('.gif'):
-                        all_gifs.append(os.path.join(root, f))
+        search_paths = [NEXTCLOUD_PATH, wide_path]
+        for p in search_paths:
+            if os.path.exists(p):
+                print(f"🔍 Random GIF: Scanning {p}...")
+                for root, dirs, files in os.walk(p):
+                    for f in files:
+                        if f.lower().endswith('.gif'):
+                            full_p = os.path.join(root, f)
+                            if full_p not in all_gifs:
+                                all_gifs.append(full_p)
+                if all_gifs: break # Stop if we found some in first path
     except (OSError, IOError) as e:
         print(f"Error walking Nextcloud path: {e}")
         return
