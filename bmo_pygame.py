@@ -40,7 +40,18 @@ def _get_fb_device():
 
 FB_DEVICE = _get_fb_device()
 TOUCH_DEVICE = "/dev/input/event4" # SPI-connected touch panel on CS1
-NEXTCLOUD_PATH = "/home/pi/bmo/nextcloud_cache/shr/BMO_Agnes"
+def _get_nextcloud_path():
+    base_path = "/home/pi/bmo/nextcloud_cache"
+    shr_path = os.path.join(base_path, "shr", "BMO_Agnes")
+    if os.path.exists(shr_path):
+        return shr_path
+    if os.path.exists(base_path):
+        # Fallback to base path if shr structure is missing
+        return base_path
+    return shr_path # Default to previous behavior if neither exists
+
+NEXTCLOUD_PATH = _get_nextcloud_path()
+
 CONFIG_FILE = "/home/pi/bmo/bmo_config.json"
 BMO_FACES_ROOT = "/home/pi/bmo/bmo_faces"
 IDLE_THOUGHT_DIR = "/home/pi/bmo/bmo_assets/idle/thought"
@@ -929,6 +940,8 @@ def start_gif_player(subdir):
     state["gif_player"]["path"] = path
     state["gif_player"]["gifs"] = []
     
+    print(f"🔍 Starting GIF player for subdir: {subdir}")
+    print(f"📂 Searching in: {path}")
     # Scan for GIFs
     if os.path.exists(path):
         try:
@@ -939,7 +952,19 @@ def start_gif_player(subdir):
             print(f"Error accessing GIF path {path}: {e}")
     
     if not state["gif_player"]["gifs"]:
-        print(f"No GIFs found in {path}")
+        print(f"⚠️ No GIFs found in {path}")
+        # Try a recursive search as a last resort if the specific subdir/Photos/GIFs is missing
+        print(f"🔍 Attempting recursive search in {NEXTCLOUD_PATH}...")
+        try:
+            for root, dirs, files in os.walk(NEXTCLOUD_PATH):
+                for f in files:
+                    if f.lower().endswith('.gif'):
+                        state["gif_player"]["gifs"].append(os.path.join(root, f))
+        except Exception as e:
+            print(f"Recursive search error: {e}")
+
+    if not state["gif_player"]["gifs"]:
+        print(f"❌ Still no GIFs found after recursive search in {NEXTCLOUD_PATH}")
         state["mode"] = "MENU"
         return
     

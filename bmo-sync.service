@@ -5,6 +5,8 @@ After=network.target
 [Service]
 Type=simple
 ExecStart=/usr/bin/rclone copy NextCloud: /home/pi/bmo/nextcloud_cache --transfers 4 --checkers 8
+Restart=on-failure
+RestartSec=60s
 User=pi
 Group=pi
 
