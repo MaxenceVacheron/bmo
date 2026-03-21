@@ -255,6 +255,7 @@ MENUS = {
     "NEXTCLOUD": [
         {"label": "PHOTOS", "action": "MENU:D_PHOTO", "color": YELLOW},
         {"label": "GIFs", "action": "MENU:D_GIF", "color": GREEN},
+        {"label": "RANDOM GIF", "action": "RANDOM_GIF", "color": PINK},
         {"label": "TEXTES", "action": "MENU:D_TEXT", "color": BLUE},
         {"label": "< BACK", "action": "BACK", "color": GRAY},
     ],
@@ -314,7 +315,8 @@ state = {
             "next_time": time.time() + 20,
             "notes": []
         },
-        "next_heart_time": time.time() + 300 # Random Heart every 5-10 mins
+        "next_heart_time": time.time() + 300, # Random Heart every 5-10 mins
+        "next_gif_time": time.time() + 120    # Pre-initialize GIF timer (2 min after start)
     },
     "startup": {
         "message": f"Hello Agnès! I'm {DEVICE_NAME}. Maxence built my brain just for you.",
@@ -1527,6 +1529,16 @@ def update_face():
             state["needs_redraw"] = True
             sys.stdout.flush()
             return # Don't process other idle behaviors this frame
+        
+        # 0.5 Random GIF Trigger
+        if now > state["idle"].get("next_gif_time", 0):
+            print("🎲 Periodic Random GIF Triggered!")
+            trigger_random_gif()
+            # Schedule next one in 10-20 minutes
+            state["idle"]["next_gif_time"] = now + random.uniform(600, 1200)
+            state["needs_redraw"] = True
+            sys.stdout.flush()
+            return
 
         # 1. Thought Bubbles
         if not state["idle"]["thought"]["is_active"]:
@@ -2638,6 +2650,8 @@ def main():
                             start_slideshow(action.split(":")[1])
                         elif action.startswith("GIF:"):
                             start_gif_player(action.split(":")[1])
+                        elif action == "RANDOM_GIF":
+                            trigger_random_gif()
                         elif action.startswith("TEXT:"):
                             start_text_viewer(action.split(":")[1])
                         elif action.startswith("FOCUS:"):
